@@ -1,10 +1,10 @@
 # digital-currency-v1
 
-An implementation of digital currency.
+Implementation of digital currency.
 
 Compile server program:
 ```
-gcc -o simple_server simple_server.cpp
+gcc -o simple_server simple_server.c
 ```
 
 Launch server program:
@@ -12,7 +12,7 @@ Launch server program:
 ./simple_server
 ```
 
-To test server program:
+Test server program:
 ```
 curl http://localhost:8080
 ```
