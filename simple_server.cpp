@@ -7,21 +7,25 @@
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
+#define PUBLIC_KEY_SIZE 65
 
 int request_counter = 0;
 pthread_mutex_t counter_lock;
 
 void bytes_to_hex_string(const unsigned char* bytes, size_t len, char* hex_string, size_t hex_string_size) {
     // Check that the buffer is large enough
-    if (hex_string_size < (len * 2 + 1)) {
+    if (hex_string_size < (2 + len * 2 + 1)) {
         // Not enough space in the buffer, handle error as needed
         return;
     }
 
+    hex_string[len * 2] = '\0';
+    snprintf(hex_string, 3, "0X");
+
     // Convert each byte to a 2-digit hexadecimal representation
     for (size_t i = 0; i < len; i++) {
         // Use snprintf to safely format each byte as a hexadecimal string
-        snprintf(hex_string + (i * 2), 3, "%02X", bytes[i]);
+        snprintf(hex_string + 2 + (i * 2), 3, "%02X", bytes[i]);
     }
 
     // Null-terminate the string
@@ -89,14 +93,25 @@ int main() {
         char response_body[BUFFER_SIZE];
         // snprintf(response_body, sizeof(response_body), "Hello, World! This is request number %d.\n", current_request_number);
 
-        int index = 0;
-        int recipient_pk = 12;
+        int transaction_index = 0;
 
-        unsigned char sender_pk[5] = {0x12, 0xA5, 0x4B, 0xFF, 0x90};
-        char sender_pk_hex[5 * 2 + 1];
-        bytes_to_hex_string(sender_pk, 5, sender_pk_hex, sizeof(sender_pk_hex));
+        unsigned char sender_public_key[PUBLIC_KEY_SIZE];
+        for (int i = 0; i < PUBLIC_KEY_SIZE; i++) {
+            sender_public_key[i] = i;
+        }
+        // "0X" + 2 characters for each byte + '\0' terminator
+        char sender_public_key_hex[2 + PUBLIC_KEY_SIZE * 2 + 1];
+        bytes_to_hex_string(sender_public_key, PUBLIC_KEY_SIZE, sender_public_key_hex, sizeof(sender_public_key_hex));
 
-        snprintf(response_body, sizeof(response_body), "Index: %d\nSender public key (hex): %s\nRecipient public key: %d\n", index, sender_pk_hex, recipient_pk);
+        unsigned char recipient_public_key[PUBLIC_KEY_SIZE];
+        for (int i = 0; i < PUBLIC_KEY_SIZE; i++) {
+            recipient_public_key[i] = i;
+        }
+        // "0X" + 2 characters for each byte + '\0' terminator
+        char recipient_public_key_hex[2 + PUBLIC_KEY_SIZE * 2 + 1];
+        bytes_to_hex_string(recipient_public_key, PUBLIC_KEY_SIZE, recipient_public_key_hex, sizeof(recipient_public_key_hex));
+
+        snprintf(response_body, sizeof(response_body), "Index: %d\nSender public key: %s\nRecipient public key: %s\n", transaction_index, sender_public_key_hex, recipient_public_key_hex);
 
         // Create the full HTTP response, including headers and body
         char http_response[BUFFER_SIZE];
