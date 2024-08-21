@@ -137,6 +137,56 @@ int main() {
             exit(EXIT_FAILURE);
         }
 
+        // Read the client request into the buffer (optional, just for printing)
+        char request_buffer[BUFFER_SIZE] = {0};
+        int bytes_read = read(new_socket, request_buffer, BUFFER_SIZE - 1);
+        if (bytes_read > 0) {
+            request_buffer[bytes_read] = '\0';  // Null-terminate the buffer
+            printf("Received request:\n%s\n", request_buffer);
+        }
+
+        // Extract the hash values from the query string
+        char *hash1 = NULL;
+        char *hash2 = NULL;
+        char *query_start = strchr(request_buffer, '?');
+        if (query_start) {
+            query_start++;  // Move past the '?' character
+
+            char *hash1_start = strstr(query_start, "hash1=");
+            char *hash2_start = strstr(query_start, "hash2=");
+
+            // Extract hash1
+            if (hash1_start) {
+                hash1_start += 6;  // Move past "hash1="
+                char *hash1_end = strchr(hash1_start, '&');
+                if (!hash1_end) {
+                    hash1_end = strchr(hash1_start, ' ');
+                }
+                if (hash1_end) {
+                    *hash1_end = '\0';  // Null-terminate the hash1 string
+                }
+                hash1 = hash1_start;
+            }
+
+            // Extract hash2
+            if (hash2_start) {
+                hash2_start += 6;  // Move past "hash2="
+                char *hash2_end = strchr(hash2_start, ' ');
+                if (hash2_end) {
+                    *hash2_end = '\0';  // Null-terminate the hash2 string
+                }
+                hash2 = hash2_start;
+            }
+        }
+
+        if (hash1) {
+            printf("Received hash1: %s\n", hash1);
+        }
+
+        if (hash2) {
+            printf("Received hash2: %s\n", hash2);
+        }
+
         char transactions_string[NUM_TRANSACTIONS_TO_SHOW * BUFFER_SIZE];
         memset(transactions_string, 0, NUM_TRANSACTIONS_TO_SHOW * BUFFER_SIZE);
         transactions_to_string(transactions_string, sizeof(transactions_string), transactions, NUM_TRANSACTIONS_TO_SHOW);
