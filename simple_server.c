@@ -3,14 +3,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
 #define PUBLIC_KEY_SIZE 65
 
-int request_counter = 0;
-pthread_mutex_t counter_lock;
 
 void bytes_to_hex_string(const unsigned char* bytes, size_t len, char* hex_string, size_t hex_string_size) {
     // Check that the buffer is large enough
@@ -37,9 +34,7 @@ int main() {
     struct sockaddr_in address;
     int addrlen = sizeof(address);
     char buffer[BUFFER_SIZE] = {0};
-
-    // Initialize the mutex for thread safety
-    pthread_mutex_init(&counter_lock, NULL);
+    int request_counter = 0;
 
     // Create socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -77,18 +72,6 @@ int main() {
             exit(EXIT_FAILURE);
         }
 
-        // // Read the client request into the buffer (optional, just for printing)
-        // int bytes_read = read(new_socket, buffer, BUFFER_SIZE - 1);
-        // if (bytes_read > 0) {
-        //     buffer[bytes_read] = '\0';  // Null-terminate the buffer
-        //     printf("Received request:\n%s\n", buffer);
-        // }
-
-        // Lock the mutex before updating the counter
-        pthread_mutex_lock(&counter_lock);
-        int current_request_number = request_counter++;
-        pthread_mutex_unlock(&counter_lock);
-
         // Create the response body with the request number
         char response_body[BUFFER_SIZE];
         // snprintf(response_body, sizeof(response_body), "Hello, World! This is request number %d.\n", current_request_number);
@@ -124,14 +107,15 @@ int main() {
 
         // Send the HTTP response to the connected client
         send(new_socket, http_response, strlen(http_response), 0);
-        printf("HTTP response sent to client: %d\n", current_request_number);
+        printf("HTTP response sent to client: %d\n", request_counter);
+
+        request_counter += 1;
 
         // Close the client socket
         close(new_socket);
     }
 
-    // Clean up the mutex (unreachable in this case, but good practice)
-    pthread_mutex_destroy(&counter_lock);
+    // Clean up (unreachable in this case, but good practice)
     close(server_fd);
 
     return 0;
