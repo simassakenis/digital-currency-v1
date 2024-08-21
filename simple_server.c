@@ -19,23 +19,12 @@ struct Transaction {
     unsigned char digital_signature[72];               // Digital signature (72 bytes)
 };
 
-int bytes_to_hex_string(char* hex_string, size_t hex_string_size, const unsigned char* bytes, size_t len) {
-    // Check that the buffer is large enough
-    if (hex_string_size < (len * 2 + 1)) {
-        // Not enough space in the buffer, handle error as needed
-        return 0;
+int bytes_to_hex_string(char* buffer, size_t buffer_size, const unsigned char* bytes, int num_bytes) {
+    int offset = 0;
+    for (size_t i = 0; i < num_bytes; i++) {
+        offset += snprintf(buffer + offset, buffer_size - offset, "%02X", bytes[i]);
     }
-
-    // Convert each byte to a 2-digit hexadecimal representation
-    for (size_t i = 0; i < len; i++) {
-        // Use snprintf to safely format each byte as a hexadecimal string
-        snprintf(hex_string + (i * 2), 3, "%02X", bytes[i]);
-    }
-
-    // Null-terminate the string
-    hex_string[len * 2] = '\0';
-
-    return len * 2;
+    return offset;
 }
 
 // Convert a Transaction struct to a hex string and return the new offset
