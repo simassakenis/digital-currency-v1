@@ -7,7 +7,7 @@
 #define PORT 8080
 #define BUFFER_SIZE 1024
 #define PUBLIC_KEY_SIZE 65
-#define NUM_TRANSACTIONS_TO_SHOW 100
+#define NUM_TRANSACTIONS_TO_SHOW 10
 
 struct Transaction {
     unsigned char sender_public_key[65];               // Sender public key (65 bytes)
@@ -19,11 +19,11 @@ struct Transaction {
     unsigned char digital_signature[72];               // Digital signature (72 bytes)
 };
 
-void bytes_to_hex_string(const unsigned char* bytes, size_t len, char* hex_string, size_t hex_string_size) {
+int bytes_to_hex_string(char* hex_string, size_t hex_string_size, const unsigned char* bytes, size_t len) {
     // Check that the buffer is large enough
     if (hex_string_size < (len * 2 + 1)) {
         // Not enough space in the buffer, handle error as needed
-        return;
+        return 0;
     }
 
     // Convert each byte to a 2-digit hexadecimal representation
@@ -34,56 +34,59 @@ void bytes_to_hex_string(const unsigned char* bytes, size_t len, char* hex_strin
 
     // Null-terminate the string
     hex_string[len * 2] = '\0';
+
+    return len * 2;
 }
 
 // Convert a Transaction struct to a hex string and return the new offset
-size_t transaction_to_hex_string(const struct Transaction* transaction, char* output_buffer, size_t buffer_size) {
-    char hex_string[145]; // Buffer for the hex string representation (2 * 72 + 1, the largest single field)
-    size_t offset = 0;
+int transaction_to_hex_string(char* output_buffer, size_t buffer_size, const struct Transaction* transaction) {
+    int offset = 0;
 
-    bytes_to_hex_string(transaction->sender_public_key, 65, hex_string, sizeof(hex_string));
-    offset += snprintf(output_buffer + offset, buffer_size - offset, "Sender Public Key: 0X%s\n", hex_string);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "Sender Public Key: 0X");
+    offset += bytes_to_hex_string(output_buffer + offset, buffer_size - offset, transaction->sender_public_key, 65);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "\n");
 
-    bytes_to_hex_string(transaction->recipient_public_key, 65, hex_string, sizeof(hex_string));
-    offset += snprintf(output_buffer + offset, buffer_size - offset, "Recipient Public Key: 0X%s\n", hex_string);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "Recipient Public Key: 0X");
+    offset += bytes_to_hex_string(output_buffer + offset, buffer_size - offset, transaction->recipient_public_key, 65);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "\n");
 
-    bytes_to_hex_string(transaction->last_sender_transaction_hash, 32, hex_string, sizeof(hex_string));
-    offset += snprintf(output_buffer + offset, buffer_size - offset, "Last Sender Transaction Hash: 0X%s\n", hex_string);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "Last Sender Transaction Hash: 0X");
+    offset += bytes_to_hex_string(output_buffer + offset, buffer_size - offset, transaction->last_sender_transaction_hash, 32);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "\n");
 
-    bytes_to_hex_string(transaction->last_recipient_transaction_hash, 32, hex_string, sizeof(hex_string));
-    offset += snprintf(output_buffer + offset, buffer_size - offset, "Last Recipient Transaction Hash: 0X%s\n", hex_string);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "Last Recipient Transaction Hash: 0X");
+    offset += bytes_to_hex_string(output_buffer + offset, buffer_size - offset, transaction->last_recipient_transaction_hash, 32);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "\n");
 
-    bytes_to_hex_string(transaction->new_sender_balance, 8, hex_string, sizeof(hex_string));
-    offset += snprintf(output_buffer + offset, buffer_size - offset, "New Sender Balance: 0X%s\n", hex_string);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "New Sender Balance: 0X");
+    offset += bytes_to_hex_string(output_buffer + offset, buffer_size - offset, transaction->new_sender_balance, 8);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "\n");
 
-    bytes_to_hex_string(transaction->new_recipient_balance, 8, hex_string, sizeof(hex_string));
-    offset += snprintf(output_buffer + offset, buffer_size - offset, "New Recipient Balance: 0X%s\n", hex_string);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "New Recipient Balance: 0X");
+    offset += bytes_to_hex_string(output_buffer + offset, buffer_size - offset, transaction->new_recipient_balance, 8);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "\n");
 
-    bytes_to_hex_string(transaction->digital_signature, 72, hex_string, sizeof(hex_string));
-    offset += snprintf(output_buffer + offset, buffer_size - offset, "Digital Signature: 0X%s\n", hex_string);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "Digital Signature: 0X");
+    offset += bytes_to_hex_string(output_buffer + offset, buffer_size - offset, transaction->digital_signature, 72);
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "\n");
 
     return offset; // Return the new offset
 }
 
 // Function that takes an array of transactions and fills the buffer
-void transactions_to_string(const struct Transaction* transactions, size_t num_transactions, char* buffer, size_t buffer_size) {
-    size_t offset = 0;
+int transactions_to_string(char* buffer, size_t buffer_size, const struct Transaction* transactions, int num_transactions) {
+    int offset = 0;
 
-    for (size_t i = 0; i < num_transactions; i++) {
-        // Insert transaction index into the output string
-        offset += snprintf(buffer + offset, buffer_size - offset, "Transaction index: %zu\n", i);
-
-        // Convert each transaction to a hex string and update the offset
-        offset += transaction_to_hex_string(&transactions[i], buffer + offset, buffer_size - offset);
-
-        // Do not add new line separator if this is the last transaction
+    for (int i = 0; i < num_transactions; i++) {
+        offset += snprintf(buffer + offset, buffer_size - offset, "Transaction index: %d\n", i);
+        offset += transaction_to_hex_string(buffer + offset, buffer_size - offset, &transactions[i]);
         if (i == num_transactions - 1) {
             break;
         }
-
-        // Insert the empty-line separator between transactions
         offset += snprintf(buffer + offset, buffer_size - offset, "\n");
     }
+
+    return offset;
 }
 
 int main() {
@@ -146,7 +149,7 @@ int main() {
 
         char transactions_string[NUM_TRANSACTIONS_TO_SHOW * BUFFER_SIZE];
         memset(transactions_string, 0, NUM_TRANSACTIONS_TO_SHOW * BUFFER_SIZE);
-        transactions_to_string(transactions, NUM_TRANSACTIONS_TO_SHOW, transactions_string, sizeof(transactions_string));
+        transactions_to_string(transactions_string, sizeof(transactions_string), transactions, NUM_TRANSACTIONS_TO_SHOW);
 
         // Create the full HTTP response, including headers and body
         char http_response[(NUM_TRANSACTIONS_TO_SHOW + 1) * BUFFER_SIZE];
