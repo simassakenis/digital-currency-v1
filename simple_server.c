@@ -8,25 +8,58 @@
 #define BUFFER_SIZE 1024
 #define PUBLIC_KEY_SIZE 65
 
+struct Transaction {
+    unsigned char sender_public_key[65];               // Sender public key (65 bytes)
+    unsigned char recipient_public_key[65];            // Recipient public key (65 bytes)
+    unsigned char last_sender_transaction_hash[32];    // Last sender transaction hash (32 bytes)
+    unsigned char last_recipient_transaction_hash[32]; // Last recipient transaction hash (32 bytes)
+    unsigned char new_sender_balance[8];               // New sender balance (8 bytes)
+    unsigned char new_recipient_balance[8];            // New recipient balance (8 bytes)
+    unsigned char digital_signature[72];               // Digital signature (72 bytes)
+};
 
 void bytes_to_hex_string(const unsigned char* bytes, size_t len, char* hex_string, size_t hex_string_size) {
     // Check that the buffer is large enough
-    if (hex_string_size < (2 + len * 2 + 1)) {
+    if (hex_string_size < (len * 2 + 1)) {
         // Not enough space in the buffer, handle error as needed
         return;
     }
 
-    hex_string[len * 2] = '\0';
-    snprintf(hex_string, 3, "0X");
-
     // Convert each byte to a 2-digit hexadecimal representation
     for (size_t i = 0; i < len; i++) {
         // Use snprintf to safely format each byte as a hexadecimal string
-        snprintf(hex_string + 2 + (i * 2), 3, "%02X", bytes[i]);
+        snprintf(hex_string + (i * 2), 3, "%02X", bytes[i]);
     }
 
     // Null-terminate the string
     hex_string[len * 2] = '\0';
+}
+
+void transaction_to_hex_string(const struct Transaction* transaction, char* output_buffer, size_t buffer_size) {
+    char hex_string[145]; // Buffer for the hex string representation (2 * 72 + 1, the largest single field)
+    size_t offset = 0;
+
+    // Convert each field and append to the output buffer
+    bytes_to_hex_string(transaction->sender_public_key, 65, hex_string, sizeof(hex_string));
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "Sender Public Key: %s\n", hex_string);
+
+    bytes_to_hex_string(transaction->recipient_public_key, 65, hex_string, sizeof(hex_string));
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "Recipient Public Key: %s\n", hex_string);
+
+    bytes_to_hex_string(transaction->last_sender_transaction_hash, 32, hex_string, sizeof(hex_string));
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "Last Sender Transaction Hash: %s\n", hex_string);
+
+    bytes_to_hex_string(transaction->last_recipient_transaction_hash, 32, hex_string, sizeof(hex_string));
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "Last Recipient Transaction Hash: %s\n", hex_string);
+
+    bytes_to_hex_string(transaction->new_sender_balance, 8, hex_string, sizeof(hex_string));
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "New Sender Balance: %s\n", hex_string);
+
+    bytes_to_hex_string(transaction->new_recipient_balance, 8, hex_string, sizeof(hex_string));
+    offset += snprintf(output_buffer + offset, buffer_size - offset, "New Recipient Balance: %s\n", hex_string);
+
+    bytes_to_hex_string(transaction->digital_signature, 72, hex_string, sizeof(hex_string));
+    snprintf(output_buffer + offset, buffer_size - offset, "Digital Signature: %s\n", hex_string);
 }
 
 int main() {
@@ -78,23 +111,26 @@ int main() {
 
         int transaction_index = 0;
 
-        unsigned char sender_public_key[PUBLIC_KEY_SIZE];
-        for (int i = 0; i < PUBLIC_KEY_SIZE; i++) {
-            sender_public_key[i] = i;
-        }
-        // "0X" + 2 characters for each byte + '\0' terminator
-        char sender_public_key_hex[2 + PUBLIC_KEY_SIZE * 2 + 1];
-        bytes_to_hex_string(sender_public_key, PUBLIC_KEY_SIZE, sender_public_key_hex, sizeof(sender_public_key_hex));
+        struct Transaction transaction = {
+            {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40, 0x41},
+            {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40, 0x41},
+            {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99},
+            {0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, 0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, 0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA},
+            {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08},
+            {0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01},
+            {0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD}
+        };
 
-        unsigned char recipient_public_key[PUBLIC_KEY_SIZE];
-        for (int i = 0; i < PUBLIC_KEY_SIZE; i++) {
-            recipient_public_key[i] = i;
+        // Initialize an array of 10 transactions
+        struct Transaction transactions[10];
+        for (int i = 0; i < 10; ++i) {
+            transactions[i] = transaction;
         }
-        // "0X" + 2 characters for each byte + '\0' terminator
-        char recipient_public_key_hex[2 + PUBLIC_KEY_SIZE * 2 + 1];
-        bytes_to_hex_string(recipient_public_key, PUBLIC_KEY_SIZE, recipient_public_key_hex, sizeof(recipient_public_key_hex));
 
-        snprintf(response_body, sizeof(response_body), "Index: %d\nSender public key: %s\nRecipient public key: %s\n", transaction_index, sender_public_key_hex, recipient_public_key_hex);
+        char transaction_string[BUFFER_SIZE];
+        transaction_to_hex_string(&transaction, transaction_string, sizeof(transaction_string));
+
+        snprintf(response_body, sizeof(response_body), "Index: %d\n%s", transaction_index, transaction_string);
 
         // Create the full HTTP response, including headers and body
         char http_response[BUFFER_SIZE];
