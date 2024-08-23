@@ -7,7 +7,7 @@
 #define PORT 8080
 #define BUFFER_SIZE 1024
 #define PUBLIC_KEY_SIZE 65
-#define NUM_TRANSACTIONS_TO_SHOW 10
+#define NUM_TRANSACTIONS_TO_SHOW 2
 
 struct Transaction {
     unsigned char index[16];                            // Transaction index (16 bytes)
@@ -79,7 +79,6 @@ int transactions_to_string(char* buffer, size_t buffer_size, const struct Transa
     int offset = 0;
 
     for (int i = 0; i < num_transactions; i++) {
-        offset += snprintf(buffer + offset, buffer_size - offset, "Transaction index: %d\n", i);
         offset += transaction_to_hex_string(buffer + offset, buffer_size - offset, &transactions[i]);
         if (i < num_transactions - 1) {
             offset += snprintf(buffer + offset, buffer_size - offset, "\n");
@@ -223,6 +222,7 @@ int main() {
             parse_query(query_start, &tx);
         }
 
+        transactions[0] = tx;
         printf("Transaction parsed\n");
 
         char transactions_string[NUM_TRANSACTIONS_TO_SHOW * BUFFER_SIZE];
