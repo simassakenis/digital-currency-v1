@@ -88,62 +88,78 @@ int transactions_to_string(char* buffer, size_t buffer_size, const struct Transa
     return offset;
 }
 
-// Helper function to convert a string of decimal digits into a byte array
-void decimal_to_bytes(const char *decimal_str, unsigned char *byte_array, size_t byte_array_len) {
-    unsigned long long value = strtoull(decimal_str, NULL, 10);
-    for (size_t i = 0; i < byte_array_len; i++) {
-        byte_array[byte_array_len - 1 - i] = (unsigned char)(value & 0xFF);
-        value >>= 8;
+int hex_to_bytes(const char *hex_str, unsigned char *byte_array, size_t byte_array_size) {
+    for (size_t i = 0; i < byte_array_size; i++) {
+        // sscanf should return 1, indicating one successful assignment
+        if (sscanf(hex_str + 2 * i, "%2hhx", &byte_array[i]) != 1) {
+            return -1; // Error: Invalid hex string format
+        }
     }
+    return 0; // Success
 }
 
-// Helper function to convert hex string to byte array
-void hexstr_to_bytes(const char *hexstr, unsigned char *byte_array, size_t byte_array_len) {
-    for (size_t i = 0; i < byte_array_len; i++) {
-        sscanf(hexstr + 2*i, "%2hhx", &byte_array[i]);
+int extract_param(const char *query, const char *param_name, unsigned char *dest, size_t size) {
+    const char *pos = strstr(query, param_name);
+    if (!pos || strncmp(pos + strlen(param_name), "0X", 2) != 0) {
+        return -1; // Error: Key not found or missing "0X" prefix
     }
+
+    if (hex_to_bytes(pos + strlen(param_name) + 2, dest, size) != 0) {
+        return -2; // Error: Invalid hex string
+    }
+
+    return 0; // Success
 }
 
-// Helper function to parse the query string and fill the Transaction struct
-void parse_query(char *query, struct Transaction *tx) {
-    char *param_value;
+int parse_query(const char *query, struct Transaction *tx) {
+    int result;
 
-    // Extract and parse each parameter
-    if ((param_value = strstr(query, "tx_index=")) != NULL) {
-        decimal_to_bytes(param_value + strlen("tx_index="), tx->index, sizeof(tx->index));
+    result = extract_param(query, "index=", tx->index, 16);
+    if (result != 0) {
+        return result;
     }
 
-    if ((param_value = strstr(query, "sender_pubkey=")) != NULL) {
-        hexstr_to_bytes(param_value + strlen("sender_pubkey="), tx->sender_public_key, sizeof(tx->sender_public_key));
+    result = extract_param(query, "sender_public_key=", tx->sender_public_key, 65);
+    if (result != 0) {
+        return result;
     }
 
-    if ((param_value = strstr(query, "recipient_pubkey=")) != NULL) {
-        hexstr_to_bytes(param_value + strlen("recipient_pubkey="), tx->recipient_public_key, sizeof(tx->recipient_public_key));
+    result = extract_param(query, "recipient_public_key=", tx->recipient_public_key, 65);
+    if (result != 0) {
+        return result;
     }
 
-    if ((param_value = strstr(query, "last_sender_tx_index=")) != NULL) {
-        decimal_to_bytes(param_value + strlen("last_sender_tx_index="), tx->last_sender_transaction_index, sizeof(tx->last_sender_transaction_index));
+    result = extract_param(query, "last_sender_transaction_index=", tx->last_sender_transaction_index, 16);
+    if (result != 0) {
+        return result;
     }
 
-    if ((param_value = strstr(query, "last_recipient_tx_index=")) != NULL) {
-        decimal_to_bytes(param_value + strlen("last_recipient_tx_index="), tx->last_recipient_transaction_index, sizeof(tx->last_recipient_transaction_index));
+    result = extract_param(query, "last_recipient_transaction_index=", tx->last_recipient_transaction_index, 16);
+    if (result != 0) {
+        return result;
     }
 
-    if ((param_value = strstr(query, "new_sender_balance=")) != NULL) {
-        decimal_to_bytes(param_value + strlen("new_sender_balance="), tx->new_sender_balance, sizeof(tx->new_sender_balance));
+    result = extract_param(query, "new_sender_balance=", tx->new_sender_balance, 8);
+    if (result != 0) {
+        return result;
     }
 
-    if ((param_value = strstr(query, "new_recipient_balance=")) != NULL) {
-        decimal_to_bytes(param_value + strlen("new_recipient_balance="), tx->new_recipient_balance, sizeof(tx->new_recipient_balance));
+    result = extract_param(query, "new_recipient_balance=", tx->new_recipient_balance, 8);
+    if (result != 0) {
+        return result;
     }
 
-    if ((param_value = strstr(query, "tx_hash=")) != NULL) {
-        hexstr_to_bytes(param_value + strlen("tx_hash="), tx->hash, sizeof(tx->hash));
+    result = extract_param(query, "hash=", tx->hash, 32);
+    if (result != 0) {
+        return result;
     }
 
-    if ((param_value = strstr(query, "signature=")) != NULL) {
-        hexstr_to_bytes(param_value + strlen("signature="), tx->digital_signature, sizeof(tx->digital_signature));
+    result = extract_param(query, "digital_signature=", tx->digital_signature, 72);
+    if (result != 0) {
+        return result;
     }
+
+    return 0; // Success
 }
 
 int main() {
@@ -168,7 +184,6 @@ int main() {
     struct sockaddr_in address;
     int addrlen = sizeof(address);
     char buffer[BUFFER_SIZE] = {0};
-    int request_counter = 0;
 
     // Create socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -219,18 +234,23 @@ int main() {
         char *query_start = strchr(request_buffer, '?');
         if (query_start) {
             query_start++;  // Move past the '?' character
-            parse_query(query_start, &tx);
+
+            int result = parse_query(query_start, &tx);
+            if (result == -1) {
+                printf("Error: Missing or incorrectly formatted parameter.\n");
+            } else if (result == -2) {
+                printf("Error: Invalid hex string.\n");
+            } else {
+                printf("Transaction parsed successfully.\n");
+                transactions[0] = tx;
+            }
         }
-
-        transactions[0] = tx;
-        printf("Transaction parsed\n");
-
-        char transactions_string[NUM_TRANSACTIONS_TO_SHOW * BUFFER_SIZE];
-        memset(transactions_string, 0, NUM_TRANSACTIONS_TO_SHOW * BUFFER_SIZE);
-        transactions_to_string(transactions_string, sizeof(transactions_string), transactions, NUM_TRANSACTIONS_TO_SHOW);
 
         // Create the full HTTP response, including headers and body
         char http_response[(NUM_TRANSACTIONS_TO_SHOW + 1) * BUFFER_SIZE];
+        char transactions_string[NUM_TRANSACTIONS_TO_SHOW * BUFFER_SIZE];
+        memset(transactions_string, 0, NUM_TRANSACTIONS_TO_SHOW * BUFFER_SIZE);
+        transactions_to_string(transactions_string, sizeof(transactions_string), transactions, NUM_TRANSACTIONS_TO_SHOW);
         snprintf(http_response, sizeof(http_response),
                  "HTTP/1.1 200 OK\r\n"
                  "Content-Type: text/plain\r\n"
@@ -240,9 +260,6 @@ int main() {
 
         // Send the HTTP response to the connected client
         send(new_socket, http_response, strlen(http_response), 0);
-        printf("HTTP response sent to client: %d\n", request_counter);
-
-        request_counter += 1;
 
         // Close the client socket
         close(new_socket);
