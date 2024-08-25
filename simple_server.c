@@ -5,9 +5,9 @@
 #include <arpa/inet.h>
 
 #define PORT 8080
-#define BUFFER_SIZE 1024
-#define PUBLIC_KEY_SIZE 65
-#define NUM_TRANSACTIONS_TO_SHOW 2
+#define REQUEST_BUFFER_SIZE 10240
+#define RESPONSE_BUFFER_SIZE 10240
+#define NUM_TRANSACTIONS_TO_SHOW 4
 
 struct Transaction {
     unsigned char index[16];                            // Transaction index (16 bytes)
@@ -183,7 +183,6 @@ int main() {
     int server_fd, new_socket;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
-    char buffer[BUFFER_SIZE] = {0};
 
     // Create socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -221,12 +220,11 @@ int main() {
             exit(EXIT_FAILURE);
         }
 
-        // Read the client request into the buffer (optional, just for printing)
-        char request_buffer[10 * BUFFER_SIZE] = {0};
-        int bytes_read = read(new_socket, request_buffer, BUFFER_SIZE - 1);
+        // Read the client request into the buffer
+        char request_buffer[REQUEST_BUFFER_SIZE] = {0};
+        int bytes_read = read(new_socket, request_buffer, REQUEST_BUFFER_SIZE - 1);
         if (bytes_read > 0) {
             request_buffer[bytes_read] = '\0';  // Null-terminate the buffer
-            printf("Received request:\n%s\n", request_buffer);
         }
 
         // Parse the query string into a Transaction struct
@@ -247,9 +245,8 @@ int main() {
         }
 
         // Create the full HTTP response, including headers and body
-        char http_response[(NUM_TRANSACTIONS_TO_SHOW + 1) * BUFFER_SIZE];
-        char transactions_string[NUM_TRANSACTIONS_TO_SHOW * BUFFER_SIZE];
-        memset(transactions_string, 0, NUM_TRANSACTIONS_TO_SHOW * BUFFER_SIZE);
+        char http_response[RESPONSE_BUFFER_SIZE];
+        char transactions_string[RESPONSE_BUFFER_SIZE] = {0};
         transactions_to_string(transactions_string, sizeof(transactions_string), transactions, NUM_TRANSACTIONS_TO_SHOW);
         snprintf(http_response, sizeof(http_response),
                  "HTTP/1.1 200 OK\r\n"
