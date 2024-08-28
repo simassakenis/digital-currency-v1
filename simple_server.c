@@ -7,7 +7,8 @@
 #define PORT 8080
 #define REQUEST_BUFFER_SIZE 10240
 #define RESPONSE_BUFFER_SIZE 10240
-#define NUM_TRANSACTIONS_TO_SHOW 4
+#define NUM_TRANSACTIONS_TO_SHOW 10
+#define TRANSACTIONS_CACHE_SIZE 128
 
 struct Transaction {
     unsigned char index[16];                            // Transaction index (16 bytes)
@@ -20,6 +21,21 @@ struct Transaction {
     unsigned char hash[32];                             // Transaction hash (32 bytes)
     unsigned char digital_signature[72];                // Digital signature (72 bytes)
 };
+
+struct TransactionsCache {
+    struct Transaction transactions[TRANSACTIONS_CACHE_SIZE];  // Array to hold 128 transactions
+    int count;  // Number of transactions currently in the cache
+};
+
+int add_transaction_to_cache(struct TransactionsCache *cache, const struct Transaction *transaction) {
+    if (cache->count < TRANSACTIONS_CACHE_SIZE) {
+        cache->transactions[cache->count] = *transaction;  // Copy the transaction to the cache
+        cache->count++;  // Increment the count
+        return 0;  // Success
+    } else {
+        return -1;  // Cache is full, return an error
+    }
+}
 
 int bytes_to_hex_string(char* buffer, size_t buffer_size, const unsigned char* bytes, int num_bytes) {
     int offset = 0;
@@ -74,13 +90,16 @@ int transaction_to_hex_string(char* buffer, size_t buffer_size, const struct Tra
     return offset; // Return the new offset
 }
 
-// Function that takes an array of transactions and fills the buffer
-int transactions_to_string(char* buffer, size_t buffer_size, const struct Transaction* transactions, int num_transactions) {
+int transactions_cache_to_string(char* buffer, size_t buffer_size, const struct TransactionsCache* cache) {
     int offset = 0;
+    int num_transactions_to_show = cache->count < NUM_TRANSACTIONS_TO_SHOW ? cache->count : NUM_TRANSACTIONS_TO_SHOW;
 
-    for (int i = 0; i < num_transactions; i++) {
-        offset += transaction_to_hex_string(buffer + offset, buffer_size - offset, &transactions[i]);
-        if (i < num_transactions - 1) {
+    for (int i = 0; i < num_transactions_to_show; i++) {
+        int transaction_index = cache->count - num_transactions_to_show + i;
+
+        offset += transaction_to_hex_string(buffer + offset, buffer_size - offset, &cache->transactions[transaction_index]);
+
+        if (i < num_transactions_to_show - 1) {
             offset += snprintf(buffer + offset, buffer_size - offset, "\n");
         }
     }
@@ -163,22 +182,7 @@ int parse_query(const char *query, struct Transaction *tx) {
 }
 
 int main() {
-    // Initialize an array of transactions
-    struct Transaction transaction = {
-        .index = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
-        .sender_public_key = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40, 0x41},
-        .recipient_public_key = {0x41, 0x40, 0x3F, 0x3E, 0x3D, 0x3C, 0x3B, 0x3A, 0x39, 0x38, 0x37, 0x36, 0x35, 0x34, 0x33, 0x32, 0x31, 0x30, 0x2F, 0x2E, 0x2D, 0x2C, 0x2B, 0x2A, 0x29, 0x28, 0x27, 0x26, 0x25, 0x24, 0x23, 0x22, 0x21, 0x20, 0x1F, 0x1E, 0x1D, 0x1C, 0x1B, 0x1A, 0x19, 0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11, 0x10, 0x0F, 0x0E, 0x0D, 0x0C, 0x0B, 0x0A, 0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01},
-        .last_sender_transaction_index = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F},
-        .last_recipient_transaction_index = {0x1F, 0x1E, 0x1D, 0x1C, 0x1B, 0x1A, 0x19, 0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11, 0x10},
-        .new_sender_balance = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08},
-        .new_recipient_balance = {0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01},
-        .hash = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99},
-        .digital_signature = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40, 0x41, 0x42, 0x43, 0x44}
-    };
-    struct Transaction transactions[NUM_TRANSACTIONS_TO_SHOW];
-    for (int i = 0; i < NUM_TRANSACTIONS_TO_SHOW; i++) {
-        transactions[i] = transaction;
-    }
+    struct TransactionsCache transactions_cache = {{0}, 0};
 
     int server_fd, new_socket;
     struct sockaddr_in address;
@@ -240,14 +244,14 @@ int main() {
                 printf("Error: Invalid hex string.\n");
             } else {
                 printf("Transaction parsed successfully.\n");
-                transactions[0] = tx;
+                add_transaction_to_cache(&transactions_cache, &tx);
             }
         }
 
         // Create the full HTTP response, including headers and body
         char http_response[RESPONSE_BUFFER_SIZE];
         char transactions_string[RESPONSE_BUFFER_SIZE] = {0};
-        transactions_to_string(transactions_string, sizeof(transactions_string), transactions, NUM_TRANSACTIONS_TO_SHOW);
+        transactions_cache_to_string(transactions_string, sizeof(transactions_string), &transactions_cache);
         snprintf(http_response, sizeof(http_response),
                  "HTTP/1.1 200 OK\r\n"
                  "Content-Type: text/plain\r\n"
