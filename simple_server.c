@@ -37,6 +37,11 @@ int add_transaction_to_cache(struct TransactionsCache *cache, const struct Trans
     }
 }
 
+int validate_transaction(const struct Transaction* transaction) {
+    // For now, just return 1 to indicate the transaction is valid
+    return 1;  // 1 represents true (valid)
+}
+
 int bytes_to_hex_string(char* buffer, size_t buffer_size, const unsigned char* bytes, int num_bytes) {
     int offset = 0;
 
@@ -47,7 +52,6 @@ int bytes_to_hex_string(char* buffer, size_t buffer_size, const unsigned char* b
     return offset;
 }
 
-// Convert a Transaction struct to a hex string and return the new offset
 int transaction_to_hex_string(char* buffer, size_t buffer_size, const struct Transaction* transaction) {
     int offset = 0;
 
@@ -232,19 +236,27 @@ int main() {
         }
 
         // Parse the query string into a Transaction struct
-        struct Transaction tx = {0};  // Initialize all fields to zero
         char *query_start = strchr(request_buffer, '?');
         if (query_start) {
             query_start++;  // Move past the '?' character
 
-            int result = parse_query(query_start, &tx);
+            struct Transaction new_transaction = {0};  // Initialize all fields to zero
+            int result = parse_query(query_start, &new_transaction);
             if (result == -1) {
                 printf("Error: Missing or incorrectly formatted parameter.\n");
             } else if (result == -2) {
                 printf("Error: Invalid hex string.\n");
             } else {
                 printf("Transaction parsed successfully.\n");
-                add_transaction_to_cache(&transactions_cache, &tx);
+                if (validate_transaction(&new_transaction)) {
+                    if (add_transaction_to_cache(&transactions_cache, &new_transaction) == 0) {
+                        printf("Transaction added to cache.\n");
+                    } else {
+                        printf("Error: Cache is full. Cannot add transaction.\n");
+                    }
+                } else {
+                    printf("Error: Transaction is invalid. Cannot add to cache.\n");
+                }
             }
         }
 
