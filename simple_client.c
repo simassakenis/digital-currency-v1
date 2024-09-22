@@ -6,12 +6,12 @@
 #include <sodium.h>
 
 #define HEX_PREFIX_LEN 2  // Length of "0X"
-#define SENDER_PUBLIC_KEY_LEN 132  // 65 bytes -> 130 hex chars + "0X" -> 132
-#define RECIPIENT_PUBLIC_KEY_LEN 132
-#define TX_INDEX_LEN 34  // 16 bytes -> 32 hex chars + "0X" -> 34
+#define SENDER_PUBLIC_KEY_LEN 66  // 32 bytes -> 64 hex chars + "0X" -> 66
+#define RECIPIENT_PUBLIC_KEY_LEN 66  // 32 bytes -> 64 hex chars + "0X" -> 66
+#define TX_INDEX_LEN 18  // 8 bytes -> 16 hex chars + "0X" -> 18
 #define BALANCE_LEN 18   // 8 bytes -> 16 hex chars + "0X" -> 18
 #define HASH_LEN 66  // 32 bytes -> 64 hex chars + "0X" -> 66
-#define SIGNATURE_LEN 146  // 72 bytes -> 144 hex chars + "0X" -> 146
+#define SIGNATURE_LEN 130  // 64 bytes -> 128 hex chars + "0X" -> 130
 
 #define SERVER_ADDR "127.0.0.1"
 #define SERVER_PORT 8080
@@ -110,9 +110,9 @@ int main(int argc, char *argv[]) {
     }
 
     // Hardcoded values
-    const char *index = "0X1234567890ABCDEF1234567890ABCDEF";
+    const char *index = "0X1234567890ABCDEF";
     const char *hash = "0XDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF";
-    const char *digital_signature = "0X1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCD";
+    const char *digital_signature = "0X1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF";
 
     // unsigned char hash[SHA256_HASH_SIZE];
     unsigned char public_key[crypto_sign_PUBLICKEYBYTES];
@@ -141,8 +141,6 @@ int main(int argc, char *argv[]) {
              index, sender_public_key, recipient_public_key, last_sender_transaction_index,
              last_recipient_transaction_index, new_sender_balance, new_recipient_balance,
              hash, digital_signature);
-
-    printf("URL: %s\n", request_url);
 
     // Socket setup
     int sock = socket(AF_INET, SOCK_STREAM, 0);
