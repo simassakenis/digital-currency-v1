@@ -11,15 +11,15 @@
 #define TRANSACTIONS_CACHE_SIZE 128
 
 struct Transaction {
-    unsigned char index[16];                            // Transaction index (16 bytes)
-    unsigned char sender_public_key[65];                // Sender public key (65 bytes)
-    unsigned char recipient_public_key[65];             // Recipient public key (65 bytes)
-    unsigned char last_sender_transaction_index[16];    // Last sender transaction hash (16 bytes)
-    unsigned char last_recipient_transaction_index[16]; // Last recipient transaction hash (16 bytes)
-    unsigned char new_sender_balance[8];                // New sender balance (8 bytes)
-    unsigned char new_recipient_balance[8];             // New recipient balance (8 bytes)
-    unsigned char hash[32];                             // Transaction hash (32 bytes)
-    unsigned char digital_signature[72];                // Digital signature (72 bytes)
+    unsigned char index[8];                            // Transaction index (8 bytes)
+    unsigned char sender_public_key[32];               // Sender public key (32 bytes)
+    unsigned char recipient_public_key[32];            // Recipient public key (32 bytes)
+    unsigned char last_sender_transaction_index[8];    // Last sender transaction index (8 bytes)
+    unsigned char last_recipient_transaction_index[8]; // Last recipient transaction index (8 bytes)
+    unsigned char new_sender_balance[8];               // New sender balance (8 bytes)
+    unsigned char new_recipient_balance[8];            // New recipient balance (8 bytes)
+    unsigned char hash[32];                            // Transaction hash (32 bytes)
+    unsigned char digital_signature[64];               // Digital signature (64 bytes)
 };
 
 struct TransactionsCache {
@@ -56,23 +56,23 @@ int transaction_to_hex_string(char* buffer, size_t buffer_size, const struct Tra
     int offset = 0;
 
     offset += snprintf(buffer + offset, buffer_size - offset, "Transaction Index: 0X");
-    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->index, 16);
+    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->index, 8);
     offset += snprintf(buffer + offset, buffer_size - offset, "\n");
 
     offset += snprintf(buffer + offset, buffer_size - offset, "Sender Public Key: 0X");
-    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->sender_public_key, 65);
+    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->sender_public_key, 32);
     offset += snprintf(buffer + offset, buffer_size - offset, "\n");
 
     offset += snprintf(buffer + offset, buffer_size - offset, "Recipient Public Key: 0X");
-    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->recipient_public_key, 65);
+    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->recipient_public_key, 32);
     offset += snprintf(buffer + offset, buffer_size - offset, "\n");
 
     offset += snprintf(buffer + offset, buffer_size - offset, "Last Sender Transaction Index: 0X");
-    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->last_sender_transaction_index, 16);
+    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->last_sender_transaction_index, 8);
     offset += snprintf(buffer + offset, buffer_size - offset, "\n");
 
     offset += snprintf(buffer + offset, buffer_size - offset, "Last Recipient Transaction Index: 0X");
-    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->last_recipient_transaction_index, 16);
+    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->last_recipient_transaction_index, 8);
     offset += snprintf(buffer + offset, buffer_size - offset, "\n");
 
     offset += snprintf(buffer + offset, buffer_size - offset, "New Sender Balance: 0X");
@@ -88,7 +88,7 @@ int transaction_to_hex_string(char* buffer, size_t buffer_size, const struct Tra
     offset += snprintf(buffer + offset, buffer_size - offset, "\n");
 
     offset += snprintf(buffer + offset, buffer_size - offset, "Digital Signature: 0X");
-    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->digital_signature, 72);
+    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->digital_signature, 64);
     offset += snprintf(buffer + offset, buffer_size - offset, "\n");
 
     return offset; // Return the new offset
@@ -137,27 +137,27 @@ int extract_param(const char *query, const char *param_name, unsigned char *dest
 int parse_query(const char *query, struct Transaction *tx) {
     int result;
 
-    result = extract_param(query, "index=", tx->index, 16);
+    result = extract_param(query, "index=", tx->index, 8);
     if (result != 0) {
         return result;
     }
 
-    result = extract_param(query, "sender_public_key=", tx->sender_public_key, 65);
+    result = extract_param(query, "sender_public_key=", tx->sender_public_key, 32);
     if (result != 0) {
         return result;
     }
 
-    result = extract_param(query, "recipient_public_key=", tx->recipient_public_key, 65);
+    result = extract_param(query, "recipient_public_key=", tx->recipient_public_key, 32);
     if (result != 0) {
         return result;
     }
 
-    result = extract_param(query, "last_sender_transaction_index=", tx->last_sender_transaction_index, 16);
+    result = extract_param(query, "last_sender_transaction_index=", tx->last_sender_transaction_index, 8);
     if (result != 0) {
         return result;
     }
 
-    result = extract_param(query, "last_recipient_transaction_index=", tx->last_recipient_transaction_index, 16);
+    result = extract_param(query, "last_recipient_transaction_index=", tx->last_recipient_transaction_index, 8);
     if (result != 0) {
         return result;
     }
@@ -177,7 +177,7 @@ int parse_query(const char *query, struct Transaction *tx) {
         return result;
     }
 
-    result = extract_param(query, "digital_signature=", tx->digital_signature, 72);
+    result = extract_param(query, "digital_signature=", tx->digital_signature, 64);
     if (result != 0) {
         return result;
     }
