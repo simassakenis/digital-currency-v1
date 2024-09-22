@@ -31,16 +31,6 @@ int validate_transaction(const struct Transaction* transaction) {
     return 1;  // 1 represents true (valid)
 }
 
-int bytes_to_hex_string(char* buffer, size_t buffer_size, const unsigned char* bytes, int num_bytes) {
-    int offset = 0;
-
-    for (size_t i = 0; i < num_bytes; i++) {
-        offset += snprintf(buffer + offset, buffer_size - offset, "%02X", bytes[i]);
-    }
-
-    return offset;
-}
-
 int transaction_to_hex_string(char* buffer, size_t buffer_size, const struct Transaction* transaction) {
     int offset = 0;
 
@@ -98,16 +88,6 @@ int transactions_cache_to_string(char* buffer, size_t buffer_size, const struct 
     }
 
     return offset;
-}
-
-int hex_to_bytes(const char *hex_str, unsigned char *byte_array, size_t byte_array_size) {
-    for (size_t i = 0; i < byte_array_size; i++) {
-        // sscanf should return 1, indicating one successful assignment
-        if (sscanf(hex_str + 2 * i, "%2hhx", &byte_array[i]) != 1) {
-            return -1; // Error: Invalid hex string format
-        }
-    }
-    return 0; // Success
 }
 
 int extract_param(const char *query, const char *param_name, unsigned char *dest, size_t size) {

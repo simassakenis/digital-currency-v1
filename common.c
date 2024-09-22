@@ -68,7 +68,7 @@ int verify_signature(const unsigned char *signature, const unsigned char *messag
     return 0; // Signature is valid
 }
 
-int hash_transaction_fields(unsigned char *output_buffer, const struct Transaction *tx) {
+int hash_transaction(unsigned char *output_buffer, const struct Transaction *tx) {
     // Buffer to hold the concatenated fields
     unsigned char concatenated_data[32 + 32 + 8 + 8 + 8 + 8];
     unsigned long long offset = 0;
@@ -88,5 +88,25 @@ int hash_transaction_fields(unsigned char *output_buffer, const struct Transacti
 
     // Compute the hash of the concatenated data
     return compute_sha256_hash(output_buffer, concatenated_data, sizeof(concatenated_data));
+}
+
+int bytes_to_hex_string(char* buffer, size_t buffer_size, const unsigned char* bytes, int num_bytes) {
+    int offset = 0;
+
+    for (size_t i = 0; i < num_bytes; i++) {
+        offset += snprintf(buffer + offset, buffer_size - offset, "%02X", bytes[i]);
+    }
+
+    return offset;
+}
+
+int hex_to_bytes(const char *hex_str, unsigned char *byte_array, size_t byte_array_size) {
+    for (size_t i = 0; i < byte_array_size; i++) {
+        // sscanf should return 1, indicating one successful assignment
+        if (sscanf(hex_str + 2 * i, "%2hhx", &byte_array[i]) != 1) {
+            return -1; // Error: Invalid hex string format
+        }
+    }
+    return 0; // Success
 }
 

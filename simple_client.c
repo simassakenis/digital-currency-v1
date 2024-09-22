@@ -62,13 +62,58 @@ int main(int argc, char *argv[]) {
 
     // Hardcoded values
     const char *index = "0X1234567890ABCDEF";
-    const char *hash = "0XDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF";
     const char *digital_signature = "0X1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF";
 
-    // unsigned char hash[SHA256_HASH_SIZE];
+    unsigned char hash[crypto_hash_sha256_BYTES];
     unsigned char public_key[crypto_sign_PUBLICKEYBYTES];
     unsigned char private_key[crypto_sign_SECRETKEYBYTES];
     unsigned char signature[crypto_sign_BYTES];
+
+
+    struct Transaction tx = {0};
+
+    if (hex_to_bytes(sender_public_key, tx.sender_public_key, 32) != 0) {
+        fprintf(stderr, "Error decoding sender public key\n");
+        return 1;
+    }
+
+    if (hex_to_bytes(recipient_public_key, tx.recipient_public_key, 32) != 0) {
+        fprintf(stderr, "Error decoding recipient public key\n");
+        return 1;
+    }
+
+    if (hex_to_bytes(last_sender_transaction_index, tx.last_sender_transaction_index, 8) != 0) {
+        fprintf(stderr, "Error decoding last sender transaction index\n");
+        return 1;
+    }
+
+    if (hex_to_bytes(last_recipient_transaction_index, tx.last_recipient_transaction_index, 8) != 0) {
+        fprintf(stderr, "Error decoding last recipient transaction index\n");
+        return 1;
+    }
+
+    if (hex_to_bytes(new_sender_balance, tx.new_sender_balance, 8) != 0) {
+        fprintf(stderr, "Error decoding new sender balance\n");
+        return 1;
+    }
+
+    if (hex_to_bytes(new_recipient_balance, tx.new_recipient_balance, 8) != 0) {
+        fprintf(stderr, "Error decoding new recipient balance\n");
+        return 1;
+    }
+
+    if (hash_transaction(hash, &tx) != 0) {
+        fprintf(stderr, "Error computing transaction hash\n");
+        return 1;
+    }
+
+    char hash_str[2 * crypto_hash_sha256_BYTES + 3]; // 64 hex chars + 2 for "0X" + 1 for null terminator
+    snprintf(hash_str, sizeof(hash_str), "0X");
+    if (bytes_to_hex_string(hash_str + 2, sizeof(hash_str) - 2, hash, sizeof(hash)) < 0) {
+        fprintf(stderr, "Error converting hash to hex string\n");
+        return 1;
+    }
+
 
     // Generate key pair
     if (generate_key_pair(public_key, private_key) != 0) {
@@ -91,7 +136,7 @@ int main(int argc, char *argv[]) {
              "&new_sender_balance=%s&new_recipient_balance=%s&hash=%s&digital_signature=%s",
              index, sender_public_key, recipient_public_key, last_sender_transaction_index,
              last_recipient_transaction_index, new_sender_balance, new_recipient_balance,
-             hash, digital_signature);
+             hash_str, digital_signature);
 
     // Socket setup
     int sock = socket(AF_INET, SOCK_STREAM, 0);
