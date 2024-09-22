@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sodium.h>
+#include "common.h"
 
 #define HEX_PREFIX_LEN 2  // Length of "0X"
 #define SENDER_PUBLIC_KEY_LEN 66  // 32 bytes -> 64 hex chars + "0X" -> 66
@@ -18,56 +19,6 @@
 
 int validate_hex_string(const char *hex_string, int expected_len) {
     return strlen(hex_string) == expected_len && strncmp(hex_string, "0X", HEX_PREFIX_LEN) == 0;
-}
-
-int compute_sha256_hash(unsigned char *output_buffer, const unsigned char *input_data, unsigned long long input_length) {
-    // Ensure libsodium is initialized
-    if (sodium_init() < 0) {
-        fprintf(stderr, "libsodium initialization failed\n");
-        return -1;
-    }
-
-    // Compute the SHA256 hash
-    if (crypto_hash_sha256(output_buffer, input_data, input_length) != 0) {
-        fprintf(stderr, "Hash computation failed\n");
-        return -1;
-    }
-
-    return 0; // Success
-}
-
-int generate_key_pair(unsigned char *public_key, unsigned char *private_key) {
-    // Ensure libsodium is initialized
-    if (sodium_init() < 0) {
-        fprintf(stderr, "libsodium initialization failed\n");
-        return -1;
-    }
-
-    // Generate the key pair
-    if (crypto_sign_keypair(public_key, private_key) != 0) {
-        fprintf(stderr, "Key pair generation failed\n");
-        return -1;
-    }
-
-    return 0;
-}
-
-int sign_message(const unsigned char *message, size_t message_len, const unsigned char *private_key, unsigned char *signature) {
-    unsigned long long signature_len;
-
-    // Ensure libsodium is initialized
-    if (sodium_init() < 0) {
-        fprintf(stderr, "libsodium initialization failed\n");
-        return -1;
-    }
-
-    // Sign the message
-    if (crypto_sign_detached(signature, &signature_len, message, message_len, private_key) != 0) {
-        fprintf(stderr, "Message signing failed\n");
-        return -1;
-    }
-
-    return 0;
 }
 
 int main(int argc, char *argv[]) {
