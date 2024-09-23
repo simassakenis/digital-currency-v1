@@ -62,14 +62,8 @@ int main(int argc, char *argv[]) {
 
     // Hardcoded values
     const char *index = "0X1234567890ABCDEF";
-    const char *digital_signature = "0X1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF";
 
-    unsigned char hash[crypto_hash_sha256_BYTES];
-    unsigned char public_key[crypto_sign_PUBLICKEYBYTES];
-    unsigned char private_key[crypto_sign_SECRETKEYBYTES];
-    unsigned char signature[crypto_sign_BYTES];
-
-
+    // Create a transaction from the inputs
     struct Transaction tx = {0};
 
     if (hex_to_bytes(sender_public_key, tx.sender_public_key, 32) != 0) {
@@ -102,28 +96,36 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // Generate hash
+    unsigned char hash[crypto_hash_sha256_BYTES];
     if (hash_transaction(hash, &tx) != 0) {
         fprintf(stderr, "Error computing transaction hash\n");
         return 1;
     }
 
-    char hash_str[2 * crypto_hash_sha256_BYTES + 1]; // 64 hex chars + + 1 for null terminator
+    char hash_str[2 * crypto_hash_sha256_BYTES + 1]; // 64 hex chars + 1 for null terminator
     if (bytes_to_hex_string(hash_str, sizeof(hash_str), hash, sizeof(hash)) < 0) {
         fprintf(stderr, "Error converting hash to hex string\n");
         return 1;
     }
 
-
-    // Generate key pair
+    // Generate digital signature
+    unsigned char public_key[crypto_sign_PUBLICKEYBYTES];
+    unsigned char private_key[crypto_sign_SECRETKEYBYTES];
     if (generate_key_pair(public_key, private_key) != 0) {
         fprintf(stderr, "Failed to generate key pair\n");
         return 1;
     }
 
-    // Sign the message
-    unsigned char message[32] = {0};
-    if (sign_message(message, 32, private_key, signature) != 0) {
+    unsigned char signature[crypto_sign_BYTES];
+    if (sign_message(hash, sizeof(hash), private_key, signature) != 0) {
         fprintf(stderr, "Failed to sign message\n");
+        return 1;
+    }
+
+    char signature_str[2 * crypto_sign_BYTES + 1]; // 128 hex chars + 1 for null terminator
+    if (bytes_to_hex_string(signature_str, sizeof(signature_str), signature, sizeof(signature)) < 0) {
+        fprintf(stderr, "Error converting hash to hex string\n");
         return 1;
     }
 
@@ -132,10 +134,10 @@ int main(int argc, char *argv[]) {
     snprintf(request_url, sizeof(request_url),
              "http://localhost:8080/?index=%s&sender_public_key=%s&recipient_public_key=%s"
              "&last_sender_transaction_index=%s&last_recipient_transaction_index=%s"
-             "&new_sender_balance=%s&new_recipient_balance=%s&hash=0X%s&digital_signature=%s",
+             "&new_sender_balance=%s&new_recipient_balance=%s&hash=0X%s&digital_signature=0X%s",
              index, sender_public_key, recipient_public_key, last_sender_transaction_index,
              last_recipient_transaction_index, new_sender_balance, new_recipient_balance,
-             hash_str, digital_signature);
+             hash_str, signature_str);
 
     // Socket setup
     int sock = socket(AF_INET, SOCK_STREAM, 0);
