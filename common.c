@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <sodium.h>
 #include <string.h>
 #include "common.h"
 

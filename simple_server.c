@@ -106,11 +106,6 @@ int extract_param(const char *query, const char *param_name, unsigned char *dest
 int parse_query(const char *query, struct Transaction *tx) {
     int result;
 
-    result = extract_param(query, "index=", tx->index, 8);
-    if (result != 0) {
-        return result;
-    }
-
     result = extract_param(query, "sender_public_key=", tx->sender_public_key, 32);
     if (result != 0) {
         return result;

@@ -1,9 +1,6 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include <sodium.h>
-#include <stddef.h>
-
 struct Transaction {
     unsigned char index[8];                            // Transaction index (8 bytes)
     unsigned char sender_public_key[32];               // Sender public key (32 bytes)

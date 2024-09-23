@@ -60,9 +60,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Hardcoded values
-    const char *index = "0X1234567890ABCDEF";
-
     // Create a transaction from the inputs
     struct Transaction tx = {0};
 
@@ -132,10 +129,10 @@ int main(int argc, char *argv[]) {
     // Create the full URL
     char request_url[1024];
     snprintf(request_url, sizeof(request_url),
-             "http://localhost:8080/?index=%s&sender_public_key=%s&recipient_public_key=%s"
+             "http://localhost:8080/?sender_public_key=%s&recipient_public_key=%s"
              "&last_sender_transaction_index=%s&last_recipient_transaction_index=%s"
              "&new_sender_balance=%s&new_recipient_balance=%s&hash=0X%s&digital_signature=0X%s",
-             index, sender_public_key, recipient_public_key, last_sender_transaction_index,
+             sender_public_key, recipient_public_key, last_sender_transaction_index,
              last_recipient_transaction_index, new_sender_balance, new_recipient_balance,
              hash_str, signature_str);
 
