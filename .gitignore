@@ -1,3 +1,5 @@
 simple_server
 simple_client
 *.swp
+private_key.bin
+public_key.bin

@@ -17,6 +17,10 @@ int compute_sha256_hash(unsigned char *output_buffer, const unsigned char *input
 int generate_key_pair(unsigned char *public_key, unsigned char *private_key);
 int sign_message(const unsigned char *message, size_t message_len, const unsigned char *private_key, unsigned char *signature);
 int verify_signature(const unsigned char *signature, const unsigned char *message, size_t message_len, const unsigned char *public_key);
+int save_private_key(const unsigned char *private_key, const char *filename);
+int save_public_key(const unsigned char *public_key, const char *filename);
+int load_private_key(unsigned char *private_key, const unsigned char *public_key, const char *filename);
+int load_public_key(unsigned char *public_key, const char *filename);
 int hash_transaction(unsigned char *output_buffer, const struct Transaction *tx);
 int bytes_to_hex_string(char* buffer, size_t buffer_size, const unsigned char* bytes, int num_bytes);
 int hex_to_bytes(const char *hex_str, unsigned char *byte_array, size_t byte_array_size);

@@ -68,6 +68,82 @@ int verify_signature(const unsigned char *signature, const unsigned char *messag
     return 0; // Signature is valid
 }
 
+int save_private_key(const unsigned char *private_key, const char *filename) {
+    FILE *file = fopen(filename, "wb");
+    if (file == NULL) {
+        perror("Failed to open file for writing");
+        return -1;
+    }
+
+    // Save only the first 32 bytes (private key part) of the secret key
+    if (fwrite(private_key, 1, 32, file) != 32) {
+        perror("Failed to write private key to file");
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+    return 0; // Success
+}
+
+int save_public_key(const unsigned char *public_key, const char *filename) {
+    FILE *file = fopen(filename, "wb");
+    if (file == NULL) {
+        perror("Failed to open file for writing");
+        return -1;
+    }
+
+    // Save the 32-byte public key
+    if (fwrite(public_key, 1, crypto_sign_PUBLICKEYBYTES, file) != crypto_sign_PUBLICKEYBYTES) {
+        perror("Failed to write public key to file");
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+    return 0; // Success
+}
+
+int load_private_key(unsigned char *private_key, const unsigned char *public_key, const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
+        perror("Failed to open file for reading");
+        return -1;
+    }
+
+    // Read the 32-byte private key
+    if (fread(private_key, 1, 32, file) != 32) {
+        perror("Failed to read private key from file");
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+
+    // Combine the 32-byte private key with the 32-byte public key to regenerate the full 64-byte secret key
+    memcpy(private_key + 32, public_key, crypto_sign_PUBLICKEYBYTES); // Append public key to private key
+
+    return 0; // Success
+}
+
+int load_public_key(unsigned char *public_key, const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
+        perror("Failed to open file for reading");
+        return -1;
+    }
+
+    // Read the 32-byte public key
+    if (fread(public_key, 1, crypto_sign_PUBLICKEYBYTES, file) != crypto_sign_PUBLICKEYBYTES) {
+        perror("Failed to read public key from file");
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+    return 0; // Success
+}
+
 int hash_transaction(unsigned char *output_buffer, const struct Transaction *tx) {
     // Buffer to hold the concatenated fields
     unsigned char concatenated_data[32 + 32 + 8 + 8 + 8 + 8];

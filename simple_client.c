@@ -114,6 +114,29 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    if (save_public_key(public_key, "public_key.bin") != 0) {
+        fprintf(stderr, "Failed to save public key\n");
+        return 1;
+    }
+
+    if (save_private_key(private_key, "private_key.bin") != 0) {
+        fprintf(stderr, "Failed to save private key\n");
+        return 1;
+    }
+
+    unsigned char loaded_public_key[crypto_sign_PUBLICKEYBYTES];
+    unsigned char loaded_private_key[crypto_sign_SECRETKEYBYTES];
+
+    if (load_public_key(loaded_public_key, "public_key.bin") != 0) {
+        fprintf(stderr, "Failed to load public key\n");
+        return 1;
+    }
+
+    if (load_private_key(loaded_private_key, loaded_public_key, "private_key.bin") != 0) {
+        fprintf(stderr, "Failed to load private key\n");
+        return 1;
+    }
+
     unsigned char signature[crypto_sign_BYTES];
     if (sign_message(hash, sizeof(hash), private_key, signature) != 0) {
         fprintf(stderr, "Failed to sign message\n");
