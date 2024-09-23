@@ -107,9 +107,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    char hash_str[2 * crypto_hash_sha256_BYTES + 3]; // 64 hex chars + 2 for "0X" + 1 for null terminator
-    snprintf(hash_str, sizeof(hash_str), "0X");
-    if (bytes_to_hex_string(hash_str + 2, sizeof(hash_str) - 2, hash, sizeof(hash)) < 0) {
+    char hash_str[2 * crypto_hash_sha256_BYTES + 1]; // 64 hex chars + + 1 for null terminator
+    if (bytes_to_hex_string(hash_str, sizeof(hash_str), hash, sizeof(hash)) < 0) {
         fprintf(stderr, "Error converting hash to hex string\n");
         return 1;
     }
@@ -133,7 +132,7 @@ int main(int argc, char *argv[]) {
     snprintf(request_url, sizeof(request_url),
              "http://localhost:8080/?index=%s&sender_public_key=%s&recipient_public_key=%s"
              "&last_sender_transaction_index=%s&last_recipient_transaction_index=%s"
-             "&new_sender_balance=%s&new_recipient_balance=%s&hash=%s&digital_signature=%s",
+             "&new_sender_balance=%s&new_recipient_balance=%s&hash=0X%s&digital_signature=%s",
              index, sender_public_key, recipient_public_key, last_sender_transaction_index,
              last_recipient_transaction_index, new_sender_balance, new_recipient_balance,
              hash_str, digital_signature);
