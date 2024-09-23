@@ -2,11 +2,11 @@
 
 Implementation of digital currency.
 
-There is a dependency on libsodium. Follow the installation instructions from https://doc.libsodium.org/installation.
+There is a dependency on libsodium (for hashing and digital signatures). Follow the installation instructions from https://doc.libsodium.org/installation.
 
 Compile server program:
 ```
-gcc -o simple_server simple_server.c -lsodium
+gcc -o simple_server simple_server.c common.c -lsodium
 ```
 
 Launch server program:
@@ -30,7 +30,7 @@ Test via browser:
 
 Compile client program:
 ```
-gcc -o simple_client simple_client.c -lsodium
+gcc -o simple_client simple_client.c common.c -lsodium
 ```
 
 Use client program:
