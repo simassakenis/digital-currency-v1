@@ -34,16 +34,28 @@ int validate_transaction(const struct Transaction* transaction) {
 int transaction_to_hex_string(char* buffer, size_t buffer_size, const struct Transaction* transaction) {
     int offset = 0;
 
-    offset += snprintf(buffer + offset, buffer_size - offset, "Transaction Index: 0X");
-    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->index, 8);
-    offset += snprintf(buffer + offset, buffer_size - offset, "\n");
-
     offset += snprintf(buffer + offset, buffer_size - offset, "Sender Public Key: 0X");
     offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->sender_public_key, 32);
     offset += snprintf(buffer + offset, buffer_size - offset, "\n");
 
     offset += snprintf(buffer + offset, buffer_size - offset, "Recipient Public Key: 0X");
     offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->recipient_public_key, 32);
+    offset += snprintf(buffer + offset, buffer_size - offset, "\n");
+
+    offset += snprintf(buffer + offset, buffer_size - offset, "Value transferred: 0X");
+    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->value_transferred, 8);
+    offset += snprintf(buffer + offset, buffer_size - offset, "\n");
+
+    offset += snprintf(buffer + offset, buffer_size - offset, "Nonce: 0X");
+    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->nonce, 16);
+    offset += snprintf(buffer + offset, buffer_size - offset, "\n");
+
+    offset += snprintf(buffer + offset, buffer_size - offset, "Hash: 0X");
+    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->hash, 32);
+    offset += snprintf(buffer + offset, buffer_size - offset, "\n");
+
+    offset += snprintf(buffer + offset, buffer_size - offset, "Digital Signature: 0X");
+    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->digital_signature, 64);
     offset += snprintf(buffer + offset, buffer_size - offset, "\n");
 
     offset += snprintf(buffer + offset, buffer_size - offset, "Last Sender Transaction Index: 0X");
@@ -62,12 +74,8 @@ int transaction_to_hex_string(char* buffer, size_t buffer_size, const struct Tra
     offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->new_recipient_balance, 8);
     offset += snprintf(buffer + offset, buffer_size - offset, "\n");
 
-    offset += snprintf(buffer + offset, buffer_size - offset, "Transaction hash: 0X");
-    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->hash, 32);
-    offset += snprintf(buffer + offset, buffer_size - offset, "\n");
-
-    offset += snprintf(buffer + offset, buffer_size - offset, "Digital Signature: 0X");
-    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->digital_signature, 64);
+    offset += snprintf(buffer + offset, buffer_size - offset, "Transaction Index: 0X");
+    offset += bytes_to_hex_string(buffer + offset, buffer_size - offset, transaction->index, 8);
     offset += snprintf(buffer + offset, buffer_size - offset, "\n");
 
     return offset; // Return the new offset
