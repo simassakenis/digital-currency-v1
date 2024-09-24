@@ -33,8 +33,18 @@ Compile client program:
 gcc -o simple_client simple_client.c common.c -lsodium
 ```
 
-Use client program:
+Use client program to generate/load public-private key pair:
+```
+./simple_client
+```
+
+Use client program to send a new transaction:
 ```
 ./simple_client "0XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" "0XBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" "0X1234567890ABCDEF" "0X234567890ABCDEF1" "0X0000000000000064" "0X00000000000000C8"
+```
+
+Print saved public or private key manually:
+```
+xxd -p -c 32 public_key.bin
 ```
 

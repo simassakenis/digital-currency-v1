@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sodium.h>
+#include <sys/stat.h>
 #include "common.h"
 
 #define HEX_PREFIX_LEN 2  // Length of "0X"
@@ -17,11 +18,75 @@
 #define SERVER_ADDR "127.0.0.1"
 #define SERVER_PORT 8080
 
+int file_exists(const char *filename) {
+    struct stat buffer;
+    return (stat(filename, &buffer) == 0);
+}
+
 int validate_hex_string(const char *hex_string, int expected_len) {
     return strlen(hex_string) == expected_len && strncmp(hex_string, "0X", HEX_PREFIX_LEN) == 0;
 }
 
 int main(int argc, char *argv[]) {
+    // No arguments: load or generate keys
+    if (argc == 1) {
+        unsigned char public_key[crypto_sign_PUBLICKEYBYTES];
+        unsigned char private_key[crypto_sign_SECRETKEYBYTES]; // Full 64-byte buffer for private key
+
+        // Check if the public and private key files already exist
+        if (file_exists("public_key.bin") && file_exists("private_key.bin")) {
+            printf("Keys already exist. Loading from files...\n");
+
+            // Load the public key from file
+            if (load_public_key(public_key, "public_key.bin") != 0) {
+                fprintf(stderr, "Failed to load public key\n");
+                return 1;
+            }
+
+            // Load the private key from file (this will regenerate the full 64-byte private key)
+            if (load_private_key(private_key, public_key, "private_key.bin") != 0) {
+                fprintf(stderr, "Failed to load private key\n");
+                return 1;
+            }
+
+        } else {
+            printf("Keys do not exist. Generating new keys...\n");
+
+            // Generate new key pair
+            if (generate_key_pair(public_key, private_key) != 0) {
+                fprintf(stderr, "Failed to generate key pair\n");
+                return 1;
+            }
+
+            // Save the public key to file
+            if (save_public_key(public_key, "public_key.bin") != 0) {
+                fprintf(stderr, "Failed to save public key\n");
+                return 1;
+            }
+
+            // Save only the first 32 bytes of the private key to file
+            if (save_private_key(private_key, "private_key.bin") != 0) {
+                fprintf(stderr, "Failed to save private key\n");
+                return 1;
+            }
+        }
+
+        // Print the keys as hex strings
+        char public_key_hex[crypto_sign_PUBLICKEYBYTES * 2 + 1]; // 2 hex digits per byte
+        char private_key_hex[32 * 2 + 1]; // Only the first 32 bytes of private key
+
+        // Convert keys to hex strings
+        bytes_to_hex_string(public_key_hex, sizeof(public_key_hex), public_key, crypto_sign_PUBLICKEYBYTES);
+        bytes_to_hex_string(private_key_hex, sizeof(private_key_hex), private_key, 32); // Only print 32 bytes
+
+        // Print the keys
+        printf("Public Key: 0X%s\n", public_key_hex);
+        printf("Private Key: 0X%s\n", private_key_hex);
+
+        return 0;
+    }
+
+    // Transaction mode (6 arguments)
     if (argc != 7) {
         fprintf(stderr, "Usage: %s <sender_public_key> <recipient_public_key> <last_sender_transaction_index> <last_recipient_transaction_index> <new_sender_balance> <new_recipient_balance>\n", argv[0]);
         return 1;
