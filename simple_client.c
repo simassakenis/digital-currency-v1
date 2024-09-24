@@ -104,64 +104,76 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Error: Invalid sender public key length.\n");
         return 1;
     }
+
     if (!validate_hex_string(recipient_public_key, RECIPIENT_PUBLIC_KEY_LEN)) {
         fprintf(stderr, "Error: Invalid recipient public key length.\n");
         return 1;
     }
+
     if (!validate_hex_string(last_sender_transaction_index, TX_INDEX_LEN)) {
         fprintf(stderr, "Error: Invalid last sender transaction index length.\n");
         return 1;
     }
+
     if (!validate_hex_string(last_recipient_transaction_index, TX_INDEX_LEN)) {
         fprintf(stderr, "Error: Invalid last recipient transaction index length.\n");
         return 1;
     }
+
     if (!validate_hex_string(new_sender_balance, BALANCE_LEN)) {
         fprintf(stderr, "Error: Invalid new sender balance length.\n");
         return 1;
     }
+
     if (!validate_hex_string(new_recipient_balance, BALANCE_LEN)) {
         fprintf(stderr, "Error: Invalid new recipient balance length.\n");
         return 1;
     }
 
-    // Create a transaction from the inputs
-    struct Transaction tx = {0};
+    // Buffer to hold the concatenated fields
+    unsigned char concatenated_data[32 + 32 + 8 + 8 + 8 + 8];
+    int offset = 0;
 
-    if (hex_to_bytes(sender_public_key, tx.sender_public_key, 32) != 0) {
+    if (hex_to_bytes(sender_public_key, concatenated_data + offset, 32) != 0) {
         fprintf(stderr, "Error decoding sender public key\n");
         return 1;
     }
+    offset += 32;
 
-    if (hex_to_bytes(recipient_public_key, tx.recipient_public_key, 32) != 0) {
+    if (hex_to_bytes(recipient_public_key, concatenated_data + offset, 32) != 0) {
         fprintf(stderr, "Error decoding recipient public key\n");
         return 1;
     }
+    offset += 32;
 
-    if (hex_to_bytes(last_sender_transaction_index, tx.last_sender_transaction_index, 8) != 0) {
+    if (hex_to_bytes(last_sender_transaction_index, concatenated_data + offset, 8) != 0) {
         fprintf(stderr, "Error decoding last sender transaction index\n");
         return 1;
     }
+    offset += 8;
 
-    if (hex_to_bytes(last_recipient_transaction_index, tx.last_recipient_transaction_index, 8) != 0) {
+    if (hex_to_bytes(last_recipient_transaction_index, concatenated_data + offset, 8) != 0) {
         fprintf(stderr, "Error decoding last recipient transaction index\n");
         return 1;
     }
+    offset += 8;
 
-    if (hex_to_bytes(new_sender_balance, tx.new_sender_balance, 8) != 0) {
+    if (hex_to_bytes(new_sender_balance, concatenated_data + offset, 8) != 0) {
         fprintf(stderr, "Error decoding new sender balance\n");
         return 1;
     }
+    offset += 8;
 
-    if (hex_to_bytes(new_recipient_balance, tx.new_recipient_balance, 8) != 0) {
+    if (hex_to_bytes(new_recipient_balance, concatenated_data + offset, 8) != 0) {
         fprintf(stderr, "Error decoding new recipient balance\n");
         return 1;
     }
+    offset += 8;
 
-    // Generate hash
+    // Compute the hash of the concatenated data
     unsigned char hash[crypto_hash_sha256_BYTES];
-    if (hash_transaction(hash, &tx) != 0) {
-        fprintf(stderr, "Error computing transaction hash\n");
+    if (compute_sha256_hash(hash, concatenated_data, sizeof(concatenated_data)) != 0) {
+        fprintf(stderr, "Error computing hash\n");
         return 1;
     }
 
