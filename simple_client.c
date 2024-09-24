@@ -134,37 +134,37 @@ int main(int argc, char *argv[]) {
     unsigned char concatenated_data[32 + 32 + 8 + 8 + 8 + 8];
     int offset = 0;
 
-    if (hex_to_bytes(sender_public_key, concatenated_data + offset, 32) != 0) {
+    if (hex_to_bytes(sender_public_key + 2, concatenated_data + offset, 32) != 0) {
         fprintf(stderr, "Error decoding sender public key\n");
         return 1;
     }
     offset += 32;
 
-    if (hex_to_bytes(recipient_public_key, concatenated_data + offset, 32) != 0) {
+    if (hex_to_bytes(recipient_public_key + 2, concatenated_data + offset, 32) != 0) {
         fprintf(stderr, "Error decoding recipient public key\n");
         return 1;
     }
     offset += 32;
 
-    if (hex_to_bytes(last_sender_transaction_index, concatenated_data + offset, 8) != 0) {
+    if (hex_to_bytes(last_sender_transaction_index + 2, concatenated_data + offset, 8) != 0) {
         fprintf(stderr, "Error decoding last sender transaction index\n");
         return 1;
     }
     offset += 8;
 
-    if (hex_to_bytes(last_recipient_transaction_index, concatenated_data + offset, 8) != 0) {
+    if (hex_to_bytes(last_recipient_transaction_index + 2, concatenated_data + offset, 8) != 0) {
         fprintf(stderr, "Error decoding last recipient transaction index\n");
         return 1;
     }
     offset += 8;
 
-    if (hex_to_bytes(new_sender_balance, concatenated_data + offset, 8) != 0) {
+    if (hex_to_bytes(new_sender_balance + 2, concatenated_data + offset, 8) != 0) {
         fprintf(stderr, "Error decoding new sender balance\n");
         return 1;
     }
     offset += 8;
 
-    if (hex_to_bytes(new_recipient_balance, concatenated_data + offset, 8) != 0) {
+    if (hex_to_bytes(new_recipient_balance + 2, concatenated_data + offset, 8) != 0) {
         fprintf(stderr, "Error decoding new recipient balance\n");
         return 1;
     }
@@ -184,23 +184,6 @@ int main(int argc, char *argv[]) {
     }
 
     // Generate digital signature
-    unsigned char public_key[crypto_sign_PUBLICKEYBYTES];
-    unsigned char private_key[crypto_sign_SECRETKEYBYTES];
-    if (generate_key_pair(public_key, private_key) != 0) {
-        fprintf(stderr, "Failed to generate key pair\n");
-        return 1;
-    }
-
-    if (save_public_key(public_key, "public_key.bin") != 0) {
-        fprintf(stderr, "Failed to save public key\n");
-        return 1;
-    }
-
-    if (save_private_key(private_key, "private_key.bin") != 0) {
-        fprintf(stderr, "Failed to save private key\n");
-        return 1;
-    }
-
     unsigned char loaded_public_key[crypto_sign_PUBLICKEYBYTES];
     unsigned char loaded_private_key[crypto_sign_SECRETKEYBYTES];
 
@@ -214,8 +197,20 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // Compare the two public keys
+    unsigned char sender_public_key_bytes[32];
+    if (hex_to_bytes(sender_public_key + 2, sender_public_key_bytes, sizeof(sender_public_key_bytes)) != 0) {
+        fprintf(stderr, "Failed to convert sender public key from hex to bytes.\n");
+        return 1;
+    }
+
+    if (memcmp(sender_public_key_bytes, loaded_public_key, 32) != 0) {
+        fprintf(stderr, "Public key from command line does not match the loaded public key.\n");
+        return 1;
+    }
+
     unsigned char signature[crypto_sign_BYTES];
-    if (sign_message(hash, sizeof(hash), private_key, signature) != 0) {
+    if (sign_message(hash, sizeof(hash), loaded_private_key, signature) != 0) {
         fprintf(stderr, "Failed to sign message\n");
         return 1;
     }
