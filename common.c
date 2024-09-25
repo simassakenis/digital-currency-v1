@@ -18,6 +18,22 @@ int verify_signature(const unsigned char *signature, const unsigned char *messag
     return 0; // Signature is valid
 }
 
+int compute_sha256_hash(unsigned char *output_buffer, const unsigned char *input_data, size_t input_length) {
+    // Ensure libsodium is initialized
+    if (sodium_init() < 0) {
+        fprintf(stderr, "libsodium initialization failed\n");
+        return -1;
+    }
+
+    // Compute the SHA256 hash
+    if (crypto_hash_sha256(output_buffer, input_data, input_length) != 0) {
+        fprintf(stderr, "Hash computation failed\n");
+        return -1;
+    }
+
+    return 0; // Success
+}
+
 int hash_transaction(unsigned char *output_buffer, const struct Transaction *tx) {
     // Buffer to hold the concatenated fields
     unsigned char concatenated_data[32 + 32 + 8 + 8 + 8 + 8];
