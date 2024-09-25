@@ -10,6 +10,7 @@
 #define RESPONSE_BUFFER_SIZE 10240
 #define NUM_TRANSACTIONS_TO_SHOW 10
 #define TRANSACTIONS_CACHE_SIZE 128
+#define USER_CACHE_SIZE 128
 
 struct Transaction {
     unsigned char sender_public_key[32];               // Sender public key (32 bytes)
@@ -40,8 +41,81 @@ int add_transaction_to_cache(struct TransactionsCache *cache, const struct Trans
     }
 }
 
-int validate_transaction(const struct Transaction* transaction) {
-    // For now, just return 1 to indicate the transaction is valid
+struct HashTableEntry {
+    unsigned char public_key[32];     // The 32-byte public key
+    struct Transaction *transaction;  // Pointer to the most recent transaction
+    struct HashTableEntry *next;      // For handling collisions (chaining)
+};
+
+
+struct HashTable {
+    struct HashTableEntry *entries[USER_CACHE_SIZE];  // Array of pointers to entries (buckets)
+};
+
+unsigned int hash_table_index(const unsigned char *public_key) {
+    unsigned int index = 0;
+    for (int i = 0; i < 32; i++) {
+        // Multiply by 31 (a prime) for better distribution of hash values
+        index = (index * 31) + public_key[i];
+    }
+    return index % USER_CACHE_SIZE;
+}
+
+void insert_or_update(struct HashTable *table, const unsigned char *public_key, struct Transaction *transaction) {
+    unsigned int index = hash_table_index(public_key);
+    struct HashTableEntry *entry = table->entries[index];
+
+    // Search for the public key in the chain
+    while (entry != NULL) {
+        if (memcmp(entry->public_key, public_key, 32) == 0) {
+            entry->transaction = transaction;  // Update the transaction pointer
+            return;
+        }
+        entry = entry->next;
+    }
+
+    // If not found, create a new entry
+    struct HashTableEntry *new_entry = malloc(sizeof(struct HashTableEntry));
+    memcpy(new_entry->public_key, public_key, 32);
+    new_entry->transaction = transaction;
+    new_entry->next = table->entries[index];
+    table->entries[index] = new_entry;
+}
+
+struct Transaction *lookup(const struct HashTable *table, const unsigned char *public_key) {
+    unsigned int index = hash_table_index(public_key);
+    struct HashTableEntry *entry = table->entries[index];
+
+    // Traverse the chain
+    while (entry != NULL) {
+        if (memcmp(entry->public_key, public_key, 32) == 0) {
+            return entry->transaction;
+        }
+        entry = entry->next;
+    }
+    return NULL;  // Not found
+}
+
+void init_hash_table(struct HashTable *table) {
+    for (int i = 0; i < USER_CACHE_SIZE; i++) {
+        table->entries[i] = NULL;
+    }
+}
+
+void free_hash_table(struct HashTable *table) {
+    for (int i = 0; i < USER_CACHE_SIZE; i++) {
+        struct HashTableEntry *entry = table->entries[i];
+        while (entry != NULL) {
+            struct HashTableEntry *next = entry->next;
+            free(entry);
+            entry = next;
+        }
+    }
+}
+
+int validate_transaction(const struct Transaction *transaction, const struct HashTable *user_cache) {
+    struct Transaction *last_sender_transaction = lookup(user_cache, transaction->sender_public_key);
+    struct Transaction *last_recipient_transaction = lookup(user_cache, transaction->recipient_public_key);
     return 1;  // 1 represents true (valid)
 }
 
@@ -200,6 +274,10 @@ int verify_signature(const unsigned char *signature, const unsigned char *messag
 int main() {
     struct TransactionsCache transactions_cache = {{0}, 0};
 
+    // Will hold a user public key -> most recent transaction map
+    struct HashTable user_cache;
+    init_hash_table(&user_cache);
+
     int server_fd, new_socket;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
@@ -260,9 +338,12 @@ int main() {
                 printf("Error: Invalid hex string.\n");
             } else {
                 printf("Transaction parsed successfully.\n");
-                if (validate_transaction(&new_transaction)) {
+                if (validate_transaction(&new_transaction, &user_cache)) {
                     if (add_transaction_to_cache(&transactions_cache, &new_transaction) == 0) {
                         printf("Transaction added to cache.\n");
+                        struct Transaction *new_transaction_in_cache = &transactions_cache.transactions[transactions_cache.count - 1];
+                        insert_or_update(&user_cache, new_transaction.sender_public_key, new_transaction_in_cache);
+                        insert_or_update(&user_cache, new_transaction.recipient_public_key, new_transaction_in_cache);
                     } else {
                         printf("Error: Cache is full. Cannot add transaction.\n");
                     }
@@ -292,6 +373,8 @@ int main() {
 
     // Clean up (unreachable in this case, but good practice)
     close(server_fd);
+
+    free_hash_table(&user_cache);
 
     return 0;
 }
