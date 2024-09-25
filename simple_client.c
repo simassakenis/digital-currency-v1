@@ -86,23 +86,17 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    // Transaction mode (6 arguments)
-    if (argc != 5) {
-        fprintf(stderr, "Usage: %s <sender_public_key> <recipient_public_key> <value_transferred> <nonce>\n", argv[0]);
+    // Transaction mode (3 arguments)
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s <recipient_public_key> <value_transferred> <nonce>\n", argv[0]);
         return 1;
     }
 
-    const char *sender_public_key = argv[1];
-    const char *recipient_public_key = argv[2];
-    const char *value_transferred = argv[3];
-    const char *nonce = argv[4];
+    const char *recipient_public_key = argv[1];
+    const char *value_transferred = argv[2];
+    const char *nonce = argv[3];
 
     // Validate lengths of provided hex strings
-    if (!validate_hex_string(sender_public_key, 66)) {
-        fprintf(stderr, "Error: Invalid sender public key length.\n");
-        return 1;
-    }
-
     if (!validate_hex_string(recipient_public_key, 66)) {
         fprintf(stderr, "Error: Invalid recipient public key length.\n");
         return 1;
@@ -118,14 +112,24 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Buffer to hold the concatenated fields
+    unsigned char sender_public_key[crypto_sign_PUBLICKEYBYTES];
+    unsigned char sender_private_key[crypto_sign_SECRETKEYBYTES];
+
+    if (load_public_key(sender_public_key, "public_key.bin") != 0) {
+        fprintf(stderr, "Failed to load public key (to generate public-private key pair run ./simple_client)\n");
+        return 1;
+    }
+
+    if (load_private_key(sender_private_key, sender_public_key, "private_key.bin") != 0) {
+        fprintf(stderr, "Failed to load private key (to generate public-private key pair run ./simple_client)\n");
+        return 1;
+    }
+
+    // Compute the hash of concatenated public keys, value, and nonce
     unsigned char concatenated_data[32 + 32 + 8 + 16];
     int offset = 0;
 
-    if (hex_to_bytes(sender_public_key + 2, concatenated_data + offset, 32) != 0) {
-        fprintf(stderr, "Error decoding sender public key\n");
-        return 1;
-    }
+    memcpy(concatenated_data, sender_public_key, 32);
     offset += 32;
 
     if (hex_to_bytes(recipient_public_key + 2, concatenated_data + offset, 32) != 0) {
@@ -146,7 +150,6 @@ int main(int argc, char *argv[]) {
     }
     offset += 16;
 
-    // Compute the hash of the concatenated data
     unsigned char hash[crypto_hash_sha256_BYTES];
     if (compute_sha256_hash(hash, concatenated_data, sizeof(concatenated_data)) != 0) {
         fprintf(stderr, "Error computing hash\n");
@@ -159,34 +162,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Generate digital signature
-    unsigned char loaded_public_key[crypto_sign_PUBLICKEYBYTES];
-    unsigned char loaded_private_key[crypto_sign_SECRETKEYBYTES];
-
-    if (load_public_key(loaded_public_key, "public_key.bin") != 0) {
-        fprintf(stderr, "Failed to load public key\n");
-        return 1;
-    }
-
-    if (load_private_key(loaded_private_key, loaded_public_key, "private_key.bin") != 0) {
-        fprintf(stderr, "Failed to load private key\n");
-        return 1;
-    }
-
-    // Compare the two public keys
-    unsigned char sender_public_key_bytes[32];
-    if (hex_to_bytes(sender_public_key + 2, sender_public_key_bytes, sizeof(sender_public_key_bytes)) != 0) {
-        fprintf(stderr, "Failed to convert sender public key from hex to bytes.\n");
-        return 1;
-    }
-
-    if (memcmp(sender_public_key_bytes, loaded_public_key, 32) != 0) {
-        fprintf(stderr, "Public key from command line does not match the loaded public key.\n");
-        return 1;
-    }
-
     unsigned char signature[crypto_sign_BYTES];
-    if (sign_message(hash, sizeof(hash), loaded_private_key, signature) != 0) {
+    if (sign_message(hash, sizeof(hash), sender_private_key, signature) != 0) {
         fprintf(stderr, "Failed to sign message\n");
         return 1;
     }
@@ -197,12 +174,18 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    char sender_public_key_str[2 * 32 + 1]; // 64 hex chars + 1 for null terminator
+    if (bytes_to_hex_string(sender_public_key_str, sizeof(sender_public_key_str), sender_public_key, sizeof(sender_public_key)) < 0) {
+        fprintf(stderr, "Error converting sender public key to hex string\n");
+        return 1;
+    }
+
     // Create the full URL
     char request_url[1024];
     snprintf(request_url, sizeof(request_url),
-             "http://localhost:8080/?sender_public_key=%s&recipient_public_key=%s"
+             "http://localhost:8080/?sender_public_key=0X%s&recipient_public_key=%s"
              "&value_transferred=%s&nonce=%s&hash=0X%s&digital_signature=0X%s",
-             sender_public_key, recipient_public_key, value_transferred, nonce,
+             sender_public_key_str, recipient_public_key, value_transferred, nonce,
              hash_str, signature_str);
 
     // Socket setup
