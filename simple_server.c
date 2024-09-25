@@ -124,12 +124,12 @@ int parse_query(const char *query, struct Transaction *tx) {
         return result;
     }
 
-    result = extract_param(query, "value_transferred=", tx->recipient_public_key, 8);
+    result = extract_param(query, "value_transferred=", tx->value_transferred, 8);
     if (result != 0) {
         return result;
     }
 
-    result = extract_param(query, "nonce=", tx->recipient_public_key, 16);
+    result = extract_param(query, "nonce=", tx->nonce, 16);
     if (result != 0) {
         return result;
     }
