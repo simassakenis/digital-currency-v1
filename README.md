@@ -30,7 +30,7 @@ Test via browser:
 
 Compile client program:
 ```
-gcc -o simple_client simple_client.c common.c -lsodium
+gcc -o simple_client simple_client.c -lsodium
 ```
 
 Use client program to generate/load public-private key pair:

@@ -5,26 +5,162 @@
 #include <arpa/inet.h>
 #include <sodium.h>
 #include <sys/stat.h>
-#include "common.h"
-
-#define HEX_PREFIX_LEN 2  // Length of "0X"
-#define SENDER_PUBLIC_KEY_LEN 66  // 32 bytes -> 64 hex chars + "0X" -> 66
-#define RECIPIENT_PUBLIC_KEY_LEN 66  // 32 bytes -> 64 hex chars + "0X" -> 66
-#define TX_INDEX_LEN 18  // 8 bytes -> 16 hex chars + "0X" -> 18
-#define BALANCE_LEN 18   // 8 bytes -> 16 hex chars + "0X" -> 18
-#define HASH_LEN 66  // 32 bytes -> 64 hex chars + "0X" -> 66
-#define SIGNATURE_LEN 130  // 64 bytes -> 128 hex chars + "0X" -> 130
 
 #define SERVER_ADDR "127.0.0.1"
 #define SERVER_PORT 8080
 
+int bytes_to_hex_string(char* buffer, size_t buffer_size, const unsigned char* bytes, int num_bytes) {
+    int offset = 0;
+
+    for (size_t i = 0; i < num_bytes; i++) {
+        offset += snprintf(buffer + offset, buffer_size - offset, "%02X", bytes[i]);
+    }
+
+    return offset;
+}
+
+int hex_to_bytes(const char *hex_str, unsigned char *byte_array, size_t byte_array_size) {
+    for (size_t i = 0; i < byte_array_size; i++) {
+        // sscanf should return 1, indicating one successful assignment
+        if (sscanf(hex_str + 2 * i, "%2hhx", &byte_array[i]) != 1) {
+            return -1; // Error: Invalid hex string format
+        }
+    }
+    return 0; // Success
+}
 int file_exists(const char *filename) {
     struct stat buffer;
     return (stat(filename, &buffer) == 0);
 }
 
 int validate_hex_string(const char *hex_string, int expected_len) {
-    return strlen(hex_string) == expected_len && strncmp(hex_string, "0X", HEX_PREFIX_LEN) == 0;
+    return strlen(hex_string) == expected_len && strncmp(hex_string, "0X", 2) == 0;
+}
+
+int compute_sha256_hash(unsigned char *output_buffer, const unsigned char *input_data, size_t input_length) {
+    // Ensure libsodium is initialized
+    if (sodium_init() < 0) {
+        fprintf(stderr, "libsodium initialization failed\n");
+        return -1;
+    }
+
+    // Compute the SHA256 hash
+    if (crypto_hash_sha256(output_buffer, input_data, input_length) != 0) {
+        fprintf(stderr, "Hash computation failed\n");
+        return -1;
+    }
+
+    return 0; // Success
+}
+
+int generate_key_pair(unsigned char *public_key, unsigned char *private_key) {
+    // Ensure libsodium is initialized
+    if (sodium_init() < 0) {
+        fprintf(stderr, "libsodium initialization failed\n");
+        return -1;
+    }
+
+    // Generate the key pair
+    if (crypto_sign_keypair(public_key, private_key) != 0) {
+        fprintf(stderr, "Key pair generation failed\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+int sign_message(const unsigned char *message, size_t message_len, const unsigned char *private_key, unsigned char *signature) {
+    unsigned long long signature_len;
+
+    // Ensure libsodium is initialized
+    if (sodium_init() < 0) {
+        fprintf(stderr, "libsodium initialization failed\n");
+        return -1;
+    }
+
+    // Sign the message
+    if (crypto_sign_detached(signature, &signature_len, message, message_len, private_key) != 0) {
+        fprintf(stderr, "Message signing failed\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+int save_private_key(const unsigned char *private_key, const char *filename) {
+    FILE *file = fopen(filename, "wb");
+    if (file == NULL) {
+        perror("Failed to open file for writing");
+        return -1;
+    }
+
+    // Save only the first 32 bytes (private key part) of the secret key
+    if (fwrite(private_key, 1, 32, file) != 32) {
+        perror("Failed to write private key to file");
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+    return 0; // Success
+}
+
+int save_public_key(const unsigned char *public_key, const char *filename) {
+    FILE *file = fopen(filename, "wb");
+    if (file == NULL) {
+        perror("Failed to open file for writing");
+        return -1;
+    }
+
+    // Save the 32-byte public key
+    if (fwrite(public_key, 1, crypto_sign_PUBLICKEYBYTES, file) != crypto_sign_PUBLICKEYBYTES) {
+        perror("Failed to write public key to file");
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+    return 0; // Success
+}
+
+int load_private_key(unsigned char *private_key, const unsigned char *public_key, const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
+        perror("Failed to open file for reading");
+        return -1;
+    }
+
+    // Read the 32-byte private key
+    if (fread(private_key, 1, 32, file) != 32) {
+        perror("Failed to read private key from file");
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+
+    // Combine the 32-byte private key with the 32-byte public key to regenerate the full 64-byte secret key
+    memcpy(private_key + 32, public_key, crypto_sign_PUBLICKEYBYTES); // Append public key to private key
+
+    return 0; // Success
+}
+
+int load_public_key(unsigned char *public_key, const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
+        perror("Failed to open file for reading");
+        return -1;
+    }
+
+    // Read the 32-byte public key
+    if (fread(public_key, 1, crypto_sign_PUBLICKEYBYTES, file) != crypto_sign_PUBLICKEYBYTES) {
+        perror("Failed to read public key from file");
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+    return 0; // Success
 }
 
 int main(int argc, char *argv[]) {
