@@ -86,15 +86,14 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    // Transaction mode (3 arguments)
-    if (argc != 4) {
-        fprintf(stderr, "Usage: %s <recipient_public_key> <value_transferred> <nonce>\n", argv[0]);
+    // Transaction mode (2 arguments)
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <recipient_public_key> <value_transferred>\n", argv[0]);
         return 1;
     }
 
     const char *recipient_public_key = argv[1];
     const char *value_transferred = argv[2];
-    const char *nonce = argv[3];
 
     // Validate lengths of provided hex strings
     if (!validate_hex_string(recipient_public_key, 66)) {
@@ -104,11 +103,6 @@ int main(int argc, char *argv[]) {
 
     if (!validate_hex_string(value_transferred, 18)) {
         fprintf(stderr, "Error: Invalid trasferred value length.\n");
-        return 1;
-    }
-
-    if (!validate_hex_string(nonce, 34)) {
-        fprintf(stderr, "Error: Invalid nonce length.\n");
         return 1;
     }
 
@@ -124,6 +118,9 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Failed to load private key (to generate public-private key pair run ./simple_client)\n");
         return 1;
     }
+
+    unsigned char nonce[16];
+    randombytes_buf(nonce, sizeof(nonce));
 
     // Compute the hash of concatenated public keys, value, and nonce
     unsigned char concatenated_data[32 + 32 + 8 + 16];
@@ -144,10 +141,7 @@ int main(int argc, char *argv[]) {
     }
     offset += 8;
 
-    if (hex_to_bytes(nonce + 2, concatenated_data + offset, 16) != 0) {
-        fprintf(stderr, "Error decoding nonce\n");
-        return 1;
-    }
+    memcpy(concatenated_data + offset, nonce, 16);
     offset += 16;
 
     unsigned char hash[crypto_hash_sha256_BYTES];
@@ -180,13 +174,19 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    char nonce_str[2 * 16 + 1]; // 32 hex chars + 1 for null terminator
+    if (bytes_to_hex_string(nonce_str, sizeof(nonce_str), nonce, sizeof(nonce)) < 0) {
+        fprintf(stderr, "Error converting nonce to hex string\n");
+        return 1;
+    }
+
     // Create the full URL
     char request_url[1024];
     snprintf(request_url, sizeof(request_url),
              "http://localhost:8080/?sender_public_key=0X%s&recipient_public_key=%s"
-             "&value_transferred=%s&nonce=%s&hash=0X%s&digital_signature=0X%s",
-             sender_public_key_str, recipient_public_key, value_transferred, nonce,
-             hash_str, signature_str);
+             "&value_transferred=%s&nonce=0X%s&hash=0X%s&digital_signature=0X%s",
+             sender_public_key_str, recipient_public_key, value_transferred,
+             nonce_str, hash_str, signature_str);
 
     // Socket setup
     int sock = socket(AF_INET, SOCK_STREAM, 0);

@@ -40,7 +40,7 @@ Use client program to generate/load public-private key pair:
 
 Use client program to send a new transaction:
 ```
-./simple_client "0XBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" "0X1234567890ABCDEF" "0X234567890ABCDEF1234567890ABCDEF1"
+./simple_client "0XBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" "0X1234567890ABCDEF"
 ```
 
 Print saved public or private key manually:
