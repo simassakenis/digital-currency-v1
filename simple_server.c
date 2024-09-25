@@ -124,22 +124,12 @@ int parse_query(const char *query, struct Transaction *tx) {
         return result;
     }
 
-    result = extract_param(query, "last_sender_transaction_index=", tx->last_sender_transaction_index, 8);
+    result = extract_param(query, "value_transferred=", tx->recipient_public_key, 8);
     if (result != 0) {
         return result;
     }
 
-    result = extract_param(query, "last_recipient_transaction_index=", tx->last_recipient_transaction_index, 8);
-    if (result != 0) {
-        return result;
-    }
-
-    result = extract_param(query, "new_sender_balance=", tx->new_sender_balance, 8);
-    if (result != 0) {
-        return result;
-    }
-
-    result = extract_param(query, "new_recipient_balance=", tx->new_recipient_balance, 8);
+    result = extract_param(query, "nonce=", tx->recipient_public_key, 16);
     if (result != 0) {
         return result;
     }

@@ -87,51 +87,39 @@ int main(int argc, char *argv[]) {
     }
 
     // Transaction mode (6 arguments)
-    if (argc != 7) {
-        fprintf(stderr, "Usage: %s <sender_public_key> <recipient_public_key> <last_sender_transaction_index> <last_recipient_transaction_index> <new_sender_balance> <new_recipient_balance>\n", argv[0]);
+    if (argc != 5) {
+        fprintf(stderr, "Usage: %s <sender_public_key> <recipient_public_key> <value_transferred> <nonce>\n", argv[0]);
         return 1;
     }
 
     const char *sender_public_key = argv[1];
     const char *recipient_public_key = argv[2];
-    const char *last_sender_transaction_index = argv[3];
-    const char *last_recipient_transaction_index = argv[4];
-    const char *new_sender_balance = argv[5];
-    const char *new_recipient_balance = argv[6];
+    const char *value_transferred = argv[3];
+    const char *nonce = argv[4];
 
     // Validate lengths of provided hex strings
-    if (!validate_hex_string(sender_public_key, SENDER_PUBLIC_KEY_LEN)) {
+    if (!validate_hex_string(sender_public_key, 66)) {
         fprintf(stderr, "Error: Invalid sender public key length.\n");
         return 1;
     }
 
-    if (!validate_hex_string(recipient_public_key, RECIPIENT_PUBLIC_KEY_LEN)) {
+    if (!validate_hex_string(recipient_public_key, 66)) {
         fprintf(stderr, "Error: Invalid recipient public key length.\n");
         return 1;
     }
 
-    if (!validate_hex_string(last_sender_transaction_index, TX_INDEX_LEN)) {
-        fprintf(stderr, "Error: Invalid last sender transaction index length.\n");
+    if (!validate_hex_string(value_transferred, 18)) {
+        fprintf(stderr, "Error: Invalid trasferred value length.\n");
         return 1;
     }
 
-    if (!validate_hex_string(last_recipient_transaction_index, TX_INDEX_LEN)) {
-        fprintf(stderr, "Error: Invalid last recipient transaction index length.\n");
-        return 1;
-    }
-
-    if (!validate_hex_string(new_sender_balance, BALANCE_LEN)) {
-        fprintf(stderr, "Error: Invalid new sender balance length.\n");
-        return 1;
-    }
-
-    if (!validate_hex_string(new_recipient_balance, BALANCE_LEN)) {
-        fprintf(stderr, "Error: Invalid new recipient balance length.\n");
+    if (!validate_hex_string(nonce, 34)) {
+        fprintf(stderr, "Error: Invalid nonce length.\n");
         return 1;
     }
 
     // Buffer to hold the concatenated fields
-    unsigned char concatenated_data[32 + 32 + 8 + 8 + 8 + 8];
+    unsigned char concatenated_data[32 + 32 + 8 + 16];
     int offset = 0;
 
     if (hex_to_bytes(sender_public_key + 2, concatenated_data + offset, 32) != 0) {
@@ -146,29 +134,17 @@ int main(int argc, char *argv[]) {
     }
     offset += 32;
 
-    if (hex_to_bytes(last_sender_transaction_index + 2, concatenated_data + offset, 8) != 0) {
-        fprintf(stderr, "Error decoding last sender transaction index\n");
+    if (hex_to_bytes(value_transferred + 2, concatenated_data + offset, 8) != 0) {
+        fprintf(stderr, "Error decoding value transferred\n");
         return 1;
     }
     offset += 8;
 
-    if (hex_to_bytes(last_recipient_transaction_index + 2, concatenated_data + offset, 8) != 0) {
-        fprintf(stderr, "Error decoding last recipient transaction index\n");
+    if (hex_to_bytes(nonce + 2, concatenated_data + offset, 16) != 0) {
+        fprintf(stderr, "Error decoding nonce\n");
         return 1;
     }
-    offset += 8;
-
-    if (hex_to_bytes(new_sender_balance + 2, concatenated_data + offset, 8) != 0) {
-        fprintf(stderr, "Error decoding new sender balance\n");
-        return 1;
-    }
-    offset += 8;
-
-    if (hex_to_bytes(new_recipient_balance + 2, concatenated_data + offset, 8) != 0) {
-        fprintf(stderr, "Error decoding new recipient balance\n");
-        return 1;
-    }
-    offset += 8;
+    offset += 16;
 
     // Compute the hash of the concatenated data
     unsigned char hash[crypto_hash_sha256_BYTES];
@@ -225,10 +201,8 @@ int main(int argc, char *argv[]) {
     char request_url[1024];
     snprintf(request_url, sizeof(request_url),
              "http://localhost:8080/?sender_public_key=%s&recipient_public_key=%s"
-             "&last_sender_transaction_index=%s&last_recipient_transaction_index=%s"
-             "&new_sender_balance=%s&new_recipient_balance=%s&hash=0X%s&digital_signature=0X%s",
-             sender_public_key, recipient_public_key, last_sender_transaction_index,
-             last_recipient_transaction_index, new_sender_balance, new_recipient_balance,
+             "&value_transferred=%s&nonce=%s&hash=0X%s&digital_signature=0X%s",
+             sender_public_key, recipient_public_key, value_transferred, nonce,
              hash_str, signature_str);
 
     // Socket setup
