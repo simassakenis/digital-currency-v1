@@ -1,15 +1,29 @@
+#include <sodium.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include "common.h"
 
 #define PORT 8080
 #define REQUEST_BUFFER_SIZE 10240
 #define RESPONSE_BUFFER_SIZE 10240
 #define NUM_TRANSACTIONS_TO_SHOW 10
 #define TRANSACTIONS_CACHE_SIZE 128
+
+struct Transaction {
+    unsigned char sender_public_key[32];               // Sender public key (32 bytes)
+    unsigned char recipient_public_key[32];            // Recipient public key (32 bytes)
+    unsigned char value_transferred[8];                // Value transferred (8 bytes)
+    unsigned char nonce[16];                           // Nonce (random value) (16 bytes)
+    unsigned char hash[32];                            // Transaction hash (32 bytes)
+    unsigned char digital_signature[64];               // Digital signature (64 bytes)
+    unsigned char last_sender_transaction_index[8];    // Last sender transaction index (8 bytes)
+    unsigned char last_recipient_transaction_index[8]; // Last recipient transaction index (8 bytes)
+    unsigned char new_sender_balance[8];               // New sender balance (8 bytes)
+    unsigned char new_recipient_balance[8];            // New recipient balance (8 bytes)
+    unsigned char index[8];                            // Transaction index (8 bytes)
+};
 
 struct TransactionsCache {
     struct Transaction transactions[TRANSACTIONS_CACHE_SIZE];  // Array to hold 128 transactions
@@ -29,6 +43,26 @@ int add_transaction_to_cache(struct TransactionsCache *cache, const struct Trans
 int validate_transaction(const struct Transaction* transaction) {
     // For now, just return 1 to indicate the transaction is valid
     return 1;  // 1 represents true (valid)
+}
+
+int bytes_to_hex_string(char* buffer, size_t buffer_size, const unsigned char* bytes, int num_bytes) {
+    int offset = 0;
+
+    for (size_t i = 0; i < num_bytes; i++) {
+        offset += snprintf(buffer + offset, buffer_size - offset, "%02X", bytes[i]);
+    }
+
+    return offset;
+}
+
+int hex_to_bytes(const char *hex_str, unsigned char *byte_array, size_t byte_array_size) {
+    for (size_t i = 0; i < byte_array_size; i++) {
+        // sscanf should return 1, indicating one successful assignment
+        if (sscanf(hex_str + 2 * i, "%2hhx", &byte_array[i]) != 1) {
+            return -1; // Error: Invalid hex string format
+        }
+    }
+    return 0; // Success
 }
 
 int transaction_to_hex_string(char* buffer, size_t buffer_size, const struct Transaction* transaction) {
@@ -145,6 +179,22 @@ int parse_query(const char *query, struct Transaction *tx) {
     }
 
     return 0; // Success
+}
+
+int verify_signature(const unsigned char *signature, const unsigned char *message, size_t message_len, const unsigned char *public_key) {
+    // Ensure libsodium is initialized
+    if (sodium_init() < 0) {
+        fprintf(stderr, "libsodium initialization failed\n");
+        return -1;
+    }
+
+    // Verify the signature
+    if (crypto_sign_verify_detached(signature, message, message_len, public_key) != 0) {
+        // Signature is invalid
+        return -1;
+    }
+
+    return 0; // Signature is valid
 }
 
 int main() {

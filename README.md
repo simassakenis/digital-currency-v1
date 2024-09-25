@@ -6,7 +6,7 @@ There is a dependency on libsodium (for hashing and digital signatures). Follow 
 
 Compile server program:
 ```
-gcc -o simple_server simple_server.c common.c -lsodium
+gcc -o simple_server simple_server.c -lsodium
 ```
 
 Launch server program:
