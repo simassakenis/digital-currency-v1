@@ -10,7 +10,7 @@
 #define RESPONSE_BUFFER_SIZE 10240
 #define NUM_TRANSACTIONS_TO_SHOW 10
 #define TRANSACTIONS_CACHE_SIZE 128
-#define USER_CACHE_SIZE 128
+#define HASH_TABLE_SIZE 256
 
 struct Transaction {
     unsigned char sender_public_key[32];               // Sender public key (32 bytes)
@@ -41,82 +41,195 @@ int add_transaction_to_cache(struct TransactionsCache *cache, const struct Trans
     }
 }
 
+
+// Hash table entry mapping a user public key to the last transaction index
 struct HashTableEntry {
-    unsigned char public_key[32];     // The 32-byte public key
-    struct Transaction *transaction;  // Pointer to the most recent transaction
-    struct HashTableEntry *next;      // For handling collisions (chaining)
+    unsigned char public_key[32];  // User's public key (32 bytes)
+    unsigned char last_transaction_index[8];  // Index of the last transaction (8 bytes)
+    struct HashTableEntry *next;  // Pointer to the next entry in case of a collision (chaining)
 };
 
-
+// Hash table structure
 struct HashTable {
-    struct HashTableEntry *entries[USER_CACHE_SIZE];  // Array of pointers to entries (buckets)
+    struct HashTableEntry *entries[HASH_TABLE_SIZE];  // Array of pointers to linked lists
 };
 
+// Initialize the hash table
+void init_hash_table(struct HashTable *table) {
+    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+        table->entries[i] = NULL;  // Initialize all entries to NULL
+    }
+}
+
+// Simple hash function for 32-byte public keys
 unsigned int hash_table_index(const unsigned char *public_key) {
     unsigned int index = 0;
     for (int i = 0; i < 32; i++) {
         // Multiply by 31 (a prime) for better distribution of hash values
         index = (index * 31) + public_key[i];
     }
-    return index % USER_CACHE_SIZE;
+    return index % HASH_TABLE_SIZE;
 }
 
-void insert_or_update(struct HashTable *table, const unsigned char *public_key, struct Transaction *transaction) {
+// Function to look up the last transaction index for a user (with chaining)
+unsigned char *lookup(const struct HashTable *table, const unsigned char *public_key) {
     unsigned int index = hash_table_index(public_key);
     struct HashTableEntry *entry = table->entries[index];
 
-    // Search for the public key in the chain
+    // Traverse the linked list to find the matching public key
     while (entry != NULL) {
         if (memcmp(entry->public_key, public_key, 32) == 0) {
-            entry->transaction = transaction;  // Update the transaction pointer
+            return entry->last_transaction_index;  // Return the last transaction index
+        }
+        entry = entry->next;  // Move to the next entry in the chain
+    }
+
+    return NULL;  // User not found
+}
+
+// Function to update the last transaction index for a user (with chaining)
+void update(struct HashTable *table, const unsigned char *public_key, const unsigned char *last_transaction_index) {
+    unsigned int index = hash_table_index(public_key);
+    struct HashTableEntry *entry = table->entries[index];
+
+    // Traverse the linked list to find the matching public key
+    while (entry != NULL) {
+        if (memcmp(entry->public_key, public_key, 32) == 0) {
+            // Update existing entry
+            memcpy(entry->last_transaction_index, last_transaction_index, 8);
             return;
         }
-        entry = entry->next;
+        entry = entry->next;  // Move to the next entry in the chain
     }
 
-    // If not found, create a new entry
+    // If key is not found, create a new entry and add it to the front of the list
     struct HashTableEntry *new_entry = malloc(sizeof(struct HashTableEntry));
-    memcpy(new_entry->public_key, public_key, 32);
-    new_entry->transaction = transaction;
-    new_entry->next = table->entries[index];
-    table->entries[index] = new_entry;
-}
-
-struct Transaction *lookup(const struct HashTable *table, const unsigned char *public_key) {
-    unsigned int index = hash_table_index(public_key);
-    struct HashTableEntry *entry = table->entries[index];
-
-    // Traverse the chain
-    while (entry != NULL) {
-        if (memcmp(entry->public_key, public_key, 32) == 0) {
-            return entry->transaction;
-        }
-        entry = entry->next;
+    if (new_entry == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return;
     }
-    return NULL;  // Not found
+    memcpy(new_entry->public_key, public_key, 32);  // Store the public key
+    memcpy(new_entry->last_transaction_index, last_transaction_index, 8);  // Store the transaction index
+    new_entry->next = table->entries[index];  // Insert new entry at the head of the list
+    table->entries[index] = new_entry;  // Update the bucket to point to the new entry
 }
 
-void init_hash_table(struct HashTable *table) {
-    for (int i = 0; i < USER_CACHE_SIZE; i++) {
-        table->entries[i] = NULL;
-    }
-}
-
+// Function to free the memory used by the hash table
 void free_hash_table(struct HashTable *table) {
-    for (int i = 0; i < USER_CACHE_SIZE; i++) {
+    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
         struct HashTableEntry *entry = table->entries[i];
         while (entry != NULL) {
-            struct HashTableEntry *next = entry->next;
-            free(entry);
-            entry = next;
+            struct HashTableEntry *next_entry = entry->next;
+            free(entry);  // Free each entry in the chain
+            entry = next_entry;
         }
     }
 }
 
-int validate_transaction(const struct Transaction *transaction, const struct HashTable *user_cache) {
-    struct Transaction *last_sender_transaction = lookup(user_cache, transaction->sender_public_key);
-    struct Transaction *last_recipient_transaction = lookup(user_cache, transaction->recipient_public_key);
-    return 1;  // 1 represents true (valid)
+uint64_t bytes_to_uint64(const unsigned char *bytes) {
+    uint64_t result = 0;
+    for (int i = 0; i < 8; i++) {
+        result = (result << 8) | bytes[i];
+    }
+    return result;
+}
+
+int compute_sha256_hash(unsigned char *output_buffer, const unsigned char *input_data, size_t input_length) {
+    // Ensure libsodium is initialized
+    if (sodium_init() < 0) {
+        fprintf(stderr, "libsodium initialization failed\n");
+        return -1;
+    }
+
+    // Compute the SHA256 hash
+    if (crypto_hash_sha256(output_buffer, input_data, input_length) != 0) {
+        fprintf(stderr, "Hash computation failed\n");
+        return -1;
+    }
+
+    return 0; // Success
+}
+
+int verify_signature(const unsigned char *signature, const unsigned char *message, size_t message_len, const unsigned char *public_key) {
+    // Ensure libsodium is initialized
+    if (sodium_init() < 0) {
+        fprintf(stderr, "libsodium initialization failed\n");
+        return -1;
+    }
+
+    // Verify the signature
+    if (crypto_sign_verify_detached(signature, message, message_len, public_key) != 0) {
+        // Signature is invalid
+        return -1;
+    }
+
+    return 0; // Signature is valid
+}
+
+int validate_transaction(const struct Transaction *transaction, const struct HashTable *user_cache, const struct TransactionsCache *cache) {
+    if (cache->count < 10) {
+        return 1;
+    }
+
+    // Step 1: Fetch the last transaction index for the sender
+    unsigned char *last_sender_transaction_index = lookup(user_cache, transaction->sender_public_key);
+    if (last_sender_transaction_index == NULL) {
+        fprintf(stderr, "Validation failed: No previous transaction found for sender\n");
+        return 0; // Validation failed
+    }
+
+    // Step 2: Fetch the last transaction for the recipient
+    unsigned char *last_recipient_transaction_index = lookup(user_cache, transaction->recipient_public_key);
+    if (last_recipient_transaction_index == NULL) {
+        fprintf(stderr, "Validation failed: No previous transaction found for recipient\n");
+        return 0; // Validation failed
+    }
+
+    // Convert the last_sender_transaction_index from bytes to an integer to use as the cache index
+    uint64_t sender_index = bytes_to_uint64(last_sender_transaction_index);
+    if (sender_index >= cache->count) {
+        fprintf(stderr, "Validation failed: Sender's last transaction index is out of bounds\n");
+        return 0; // Validation failed
+    }
+
+    // Retrieve the last sender's transaction from the cache
+    const struct Transaction *last_sender_transaction = &cache->transactions[sender_index];
+
+    // Step 3: Check if the sender has enough balance for the transfer
+    uint64_t last_sender_balance = bytes_to_uint64(last_sender_transaction->new_sender_balance);
+    uint64_t transfer_value = bytes_to_uint64(transaction->value_transferred);
+    if (last_sender_balance < transfer_value) {
+        fprintf(stderr, "Validation failed: Sender's balance is too low for the transfer\n");
+        return 0; // Validation failed
+    }
+
+    // Step 4: Compute the expected hash of the incoming transaction
+    unsigned char computed_hash[32];
+    unsigned char concatenation_buffer[32 + 32 + 8 + 16]; // Buffer for concatenating sender, recipient, value, and nonce
+    memcpy(concatenation_buffer, transaction->sender_public_key, 32);
+    memcpy(concatenation_buffer + 32, transaction->recipient_public_key, 32);
+    memcpy(concatenation_buffer + 64, transaction->value_transferred, 8);
+    memcpy(concatenation_buffer + 72, transaction->nonce, 16);
+
+    if (compute_sha256_hash(computed_hash, concatenation_buffer, sizeof(concatenation_buffer)) != 0) {
+        fprintf(stderr, "Validation failed: Error computing transaction hash\n");
+        return 0; // Validation failed
+    }
+
+    // Step 5: Compare the computed hash with the transaction's hash
+    if (memcmp(computed_hash, transaction->hash, 32) != 0) {
+        fprintf(stderr, "Validation failed: Invalid transaction hash\n");
+        return 0; // Validation failed
+    }
+
+    // Step 6: Verify the digital signature
+    if (verify_signature(transaction->digital_signature, transaction->hash, 32, transaction->sender_public_key) != 0) {
+        fprintf(stderr, "Validation failed: Invalid digital signature\n");
+        return 0; // Validation failed
+    }
+
+    // If all checks pass
+    return 1; // Validation successful
 }
 
 int bytes_to_hex_string(char* buffer, size_t buffer_size, const unsigned char* bytes, int num_bytes) {
@@ -255,22 +368,6 @@ int parse_query(const char *query, struct Transaction *tx) {
     return 0; // Success
 }
 
-int verify_signature(const unsigned char *signature, const unsigned char *message, size_t message_len, const unsigned char *public_key) {
-    // Ensure libsodium is initialized
-    if (sodium_init() < 0) {
-        fprintf(stderr, "libsodium initialization failed\n");
-        return -1;
-    }
-
-    // Verify the signature
-    if (crypto_sign_verify_detached(signature, message, message_len, public_key) != 0) {
-        // Signature is invalid
-        return -1;
-    }
-
-    return 0; // Signature is valid
-}
-
 int main() {
     struct TransactionsCache transactions_cache = {{0}, 0};
 
@@ -338,12 +435,12 @@ int main() {
                 printf("Error: Invalid hex string.\n");
             } else {
                 printf("Transaction parsed successfully.\n");
-                if (validate_transaction(&new_transaction, &user_cache)) {
+                if (validate_transaction(&new_transaction, &user_cache, &transactions_cache)) {
                     if (add_transaction_to_cache(&transactions_cache, &new_transaction) == 0) {
                         printf("Transaction added to cache.\n");
                         struct Transaction *new_transaction_in_cache = &transactions_cache.transactions[transactions_cache.count - 1];
-                        insert_or_update(&user_cache, new_transaction.sender_public_key, new_transaction_in_cache);
-                        insert_or_update(&user_cache, new_transaction.recipient_public_key, new_transaction_in_cache);
+                        update(&user_cache, new_transaction.sender_public_key, new_transaction_in_cache->index);
+                        update(&user_cache, new_transaction.recipient_public_key, new_transaction_in_cache->index);
                     } else {
                         printf("Error: Cache is full. Cannot add transaction.\n");
                     }
