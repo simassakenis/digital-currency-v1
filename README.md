@@ -6,12 +6,12 @@ There is a dependency on libsodium (for hashing and digital signatures). Follow 
 
 Compile server program:
 ```
-gcc -o simple_server simple_server.c -lsodium
+gcc -o server server.c -lsodium
 ```
 
 Launch server program:
 ```
-./simple_server
+./server
 ```
 
 Test server program:
@@ -30,17 +30,17 @@ Test via browser:
 
 Compile client program:
 ```
-gcc -o simple_client simple_client.c -lsodium
+gcc -o client client.c -lsodium
 ```
 
 Use client program to generate/load public-private key pair:
 ```
-./simple_client
+./client
 ```
 
 Use client program to send a new transaction:
 ```
-./simple_client "0XBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" "0X1234567890ABCDEF"
+./client "0XBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" "0X1234567890ABCDEF"
 ```
 
 Print saved public or private key manually:
