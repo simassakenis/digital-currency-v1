@@ -173,7 +173,10 @@ int verify_signature(const unsigned char *signature, const unsigned char *messag
     return 0; // Signature is valid
 }
 
-int validate_and_add_transaction(struct Transaction *transaction, struct HashTable *user_cache, struct TransactionsCache *transactions_cache) {
+int validate_and_add_transaction(struct Transaction *transaction,
+                                 struct HashTable *user_cache,
+                                 struct TransactionsCache *transactions_cache,
+                                 const unsigned char *bank_public_key) {
     if (transactions_cache->count < 10) {
         if (add_transaction_to_cache(transactions_cache, transaction) != 0) {
             fprintf(stderr, "Error: Unable to add transaction to cache\n");
@@ -184,39 +187,31 @@ int validate_and_add_transaction(struct Transaction *transaction, struct HashTab
         return 0;
     }
 
-    // Step 1: Fetch the last transaction index for the sender
+    // Step 1: Check if sender has enough balance
     unsigned char *last_sender_transaction_index = lookup(user_cache, transaction->sender_public_key);
-    if (last_sender_transaction_index == NULL) {
-        fprintf(stderr, "Validation failed: No previous transaction found for sender\n");
-        return -1; // Validation failed
-    }
-
-    // Step 2: Fetch the last transaction index for the recipient
-    unsigned char *last_recipient_transaction_index = lookup(user_cache, transaction->recipient_public_key);
-    if (last_recipient_transaction_index == NULL) {
-        fprintf(stderr, "Validation failed: No previous transaction found for recipient\n");
-        return -1; // Validation failed
-    }
-
-    // Convert last transaction indices from bytes to uint64_t to fetch from cache
-    uint64_t sender_index = bytes_to_uint64(last_sender_transaction_index);
-    uint64_t recipient_index = bytes_to_uint64(last_recipient_transaction_index);
-
-    // Retrieve the last sender and recipient transactions from the cache
-    const struct Transaction *last_sender_transaction = (sender_index < transactions_cache->count) ?
-                                                        &transactions_cache->transactions[sender_index] : NULL;
-    const struct Transaction *last_recipient_transaction = (recipient_index < transactions_cache->count) ?
-                                                           &transactions_cache->transactions[recipient_index] : NULL;
-
-    // Step 3: Check if sender has enough balance
-    uint64_t last_sender_balance = last_sender_transaction ? bytes_to_uint64(last_sender_transaction->new_sender_balance) : 0;
+    uint64_t last_sender_balance = 0;
     uint64_t transfer_value = bytes_to_uint64(transaction->value_transferred);
+    if (last_sender_transaction_index != NULL) {
+        uint64_t sender_index = bytes_to_uint64(last_sender_transaction_index);
+        const struct Transaction *last_sender_transaction = (sender_index < transactions_cache->count) ?
+                                                            &transactions_cache->transactions[sender_index] : NULL;
+        last_sender_balance = last_sender_transaction ? bytes_to_uint64(last_sender_transaction->new_sender_balance) : 0;
+    } else {
+        if (memcmp(transaction->sender_public_key, bank_public_key, 32) == 0) {
+            // Bank is allowed to create money
+            last_sender_balance = transfer_value;
+        } else {
+            fprintf(stderr, "Validation failed: No previous transaction found for sender\n");
+            return -1; // Validation failed for non-bank sender
+        }
+    } 
+
     if (last_sender_balance < transfer_value) {
         fprintf(stderr, "Validation failed: Sender's balance is too low for the transfer\n");
         return -1; // Validation failed
     }
 
-    // Step 4: Compute the expected hash for the incoming transaction
+    // Step 2: Verify the hash
     unsigned char computed_hash[32];
     unsigned char concatenation_buffer[32 + 32 + 8 + 16]; // Buffer for concatenating sender, recipient, value, and nonce
     memcpy(concatenation_buffer, transaction->sender_public_key, 32);
@@ -229,44 +224,71 @@ int validate_and_add_transaction(struct Transaction *transaction, struct HashTab
         return -1; // Validation failed
     }
 
-    // Step 5: Verify the digital signature
+    if (memcmp(computed_hash, transaction->hash, 32) != 0) {
+        fprintf(stderr, "Validation failed: Computed hash does not match the provided hash\n");
+        return -1; // Validation failed
+    }
+
+    // Step 3: Verify the digital signature
     if (verify_signature(transaction->digital_signature, transaction->hash, 32, transaction->sender_public_key) != 0) {
         fprintf(stderr, "Validation failed: Invalid digital signature\n");
         return -1; // Validation failed
     }
 
-    // Step 6: Fill in the remaining fields for the transaction
+    // Step 4: Fill in the remaining fields for the transaction
 
-    // Set the last transaction indices
-    memcpy(transaction->last_sender_transaction_index, last_sender_transaction_index, 8);
-    memcpy(transaction->last_recipient_transaction_index, last_recipient_transaction_index, 8);
+    // Set the last transaction index for the sender
+    if (last_sender_transaction_index != NULL) {
+        memcpy(transaction->last_sender_transaction_index, last_sender_transaction_index, 8);
+    } else {
+        // If this is the first transaction (i.e., from the bank), set the index to 0
+        memset(transaction->last_sender_transaction_index, 0, 8);
+    }
+
+    // Set the last transaction index for the recipient
+    unsigned char *last_recipient_transaction_index = lookup(user_cache, transaction->recipient_public_key);
+    if (last_recipient_transaction_index != NULL) {
+        memcpy(transaction->last_recipient_transaction_index, last_recipient_transaction_index, 8);
+    } else {
+        // If this is the first transaction, set the index to 0
+        memset(transaction->last_recipient_transaction_index, 0, 8);
+    }
 
     // Update the sender's new balance
     uint64_t new_sender_balance = last_sender_balance - transfer_value;
     uint64_to_bytes(transaction->new_sender_balance, new_sender_balance);
 
     // Update the recipient's new balance
-    uint64_t last_recipient_balance = last_recipient_transaction ? bytes_to_uint64(last_recipient_transaction->new_recipient_balance) : 0;
-    uint64_t new_recipient_balance = last_recipient_balance + transfer_value;
-    uint64_to_bytes(transaction->new_recipient_balance, new_recipient_balance);
+    uint64_t last_recipient_balance = 0;
+    if (last_recipient_transaction_index != NULL) {
+        uint64_t recipient_index = bytes_to_uint64(last_recipient_transaction_index);
+        const struct Transaction *last_recipient_transaction = (recipient_index < transactions_cache->count) ?
+                                                               &transactions_cache->transactions[recipient_index] : NULL;
+        uint64_t last_recipient_balance = last_recipient_transaction ? bytes_to_uint64(last_recipient_transaction->new_recipient_balance) : 0;
+        uint64_t new_recipient_balance = last_recipient_balance + transfer_value;
+        uint64_to_bytes(transaction->new_recipient_balance, new_recipient_balance);
+    } else {
+        uint64_to_bytes(transaction->new_recipient_balance, transfer_value);
+    }
 
     // Assign the transaction index
     uint64_t new_transaction_index = transactions_cache->count;
     uint64_to_bytes(transaction->index, new_transaction_index);
 
-    // Step 7: Add the transaction to the transaction cache
+    // Step 5: Add the transaction to the transaction cache
     if (add_transaction_to_cache(transactions_cache, transaction) != 0) {
         fprintf(stderr, "Error: Unable to add transaction to cache\n");
         return -1; // Failed to add transaction
     }
 
-    // Step 8: Update the user cache with the new transaction index
+    // Step 6: Update the user cache with the new transaction index
     update(user_cache, transaction->sender_public_key, transaction->index);
     update(user_cache, transaction->recipient_public_key, transaction->index);
 
     printf("Transaction successfully validated and added to cache.\n");
     return 0; // Success
 }
+
 
 int bytes_to_hex_string(char* buffer, size_t buffer_size, const unsigned char* bytes, int num_bytes) {
     int offset = 0;
@@ -471,7 +493,16 @@ int main() {
                 printf("Error: Invalid hex string.\n");
             } else {
                 printf("Transaction parsed successfully.\n");
-                if (validate_and_add_transaction(&new_transaction, &user_cache, &transactions_cache) == 0) {
+                unsigned char bank_public_key[32] = {
+                    0x01, 0x02, 0x03, 0x04, 0x05,
+                    0x06, 0x07, 0x08, 0x09, 0x0A,
+                    0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                    0x10, 0x11, 0x12, 0x13, 0x14,
+                    0x15, 0x16, 0x17, 0x18, 0x19,
+                    0x1A, 0x1B, 0x1C, 0x1D, 0x1E,
+                    0x1F, 0x20
+                };
+                if (validate_and_add_transaction(&new_transaction, &user_cache, &transactions_cache, bank_public_key) == 0) {
                     printf("Transaction successfully validated and added to cache.\n");
                 } else {
                     printf("Error: Transaction validation or addition failed.\n");
