@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <sodium.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -196,15 +197,11 @@ int validate_and_add_transaction(struct Transaction *transaction,
         const struct Transaction *last_sender_transaction = (sender_index < transactions_cache->count) ?
                                                             &transactions_cache->transactions[sender_index] : NULL;
         last_sender_balance = last_sender_transaction ? bytes_to_uint64(last_sender_transaction->new_sender_balance) : 0;
-    } else {
-        if (memcmp(transaction->sender_public_key, bank_public_key, 32) == 0) {
-            // Bank is allowed to create money
-            last_sender_balance = transfer_value;
-        } else {
-            fprintf(stderr, "Validation failed: No previous transaction found for sender\n");
-            return -1; // Validation failed for non-bank sender
-        }
-    } 
+    }
+
+    if ((last_sender_transaction_index == NULL || last_sender_balance == 0) && memcmp(transaction->sender_public_key, bank_public_key, 32) == 0) {
+        last_sender_balance = transfer_value;
+    }
 
     if (last_sender_balance < transfer_value) {
         fprintf(stderr, "Validation failed: Sender's balance is too low for the transfer\n");
@@ -241,7 +238,8 @@ int validate_and_add_transaction(struct Transaction *transaction,
     if (last_sender_transaction_index != NULL) {
         memcpy(transaction->last_sender_transaction_index, last_sender_transaction_index, 8);
     } else {
-        // If this is the first transaction (i.e., from the bank), set the index to 0
+        // If this is the first sender transaction (i.e., from the bank), set the index to 0
+        assert(memcmp(transaction->sender_public_key, bank_public_key, 32) == 0);
         memset(transaction->last_sender_transaction_index, 0, 8);
     }
 
@@ -250,7 +248,7 @@ int validate_and_add_transaction(struct Transaction *transaction,
     if (last_recipient_transaction_index != NULL) {
         memcpy(transaction->last_recipient_transaction_index, last_recipient_transaction_index, 8);
     } else {
-        // If this is the first transaction, set the index to 0
+        // If this is the first recipient transaction, set the index to 0
         memset(transaction->last_recipient_transaction_index, 0, 8);
     }
 
@@ -259,7 +257,6 @@ int validate_and_add_transaction(struct Transaction *transaction,
     uint64_to_bytes(transaction->new_sender_balance, new_sender_balance);
 
     // Update the recipient's new balance
-    uint64_t last_recipient_balance = 0;
     if (last_recipient_transaction_index != NULL) {
         uint64_t recipient_index = bytes_to_uint64(last_recipient_transaction_index);
         const struct Transaction *last_recipient_transaction = (recipient_index < transactions_cache->count) ?
