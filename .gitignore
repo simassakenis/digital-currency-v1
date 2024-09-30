@@ -1,5 +1,5 @@
-simple_server
-simple_client
+server
+client
 *.swp
 private_key.bin
 public_key.bin
