@@ -431,19 +431,19 @@ int main() {
     init_hash_table(&user_cache);
 
     int server_fd, new_socket;
-    struct sockaddr_in address;
+    struct sockaddr_in6 address;  // Use sockaddr_in6 for IPv6
     int addrlen = sizeof(address);
 
-    // Create socket file descriptor
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+    // Create socket file descriptor for IPv6
+    if ((server_fd = socket(AF_INET6, SOCK_STREAM, 0)) == 0) {
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
 
-    // Define the address and port
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
+    // Define the address and port (IPv6)
+    address.sin6_family = AF_INET6;
+    address.sin6_addr = in6addr_any;   // Bind to any IPv6 address
+    address.sin6_port = htons(PORT);
 
     // Bind the socket to the network address and port
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
