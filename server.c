@@ -213,11 +213,7 @@ int validate_and_add_transaction(struct Transaction *transaction,
         last_sender_balance = last_sender_transaction ? bytes_to_uint64(last_sender_transaction->new_sender_balance) : 0;
     }
 
-    if ((last_sender_transaction_index == NULL || last_sender_balance == 0) && memcmp(transaction->sender_public_key, bank_public_key, 32) == 0) {
-        last_sender_balance = transfer_value;
-    }
-
-    if (last_sender_balance < transfer_value) {
+    if (last_sender_balance < transfer_value && memcmp(transaction->sender_public_key, bank_public_key, 32) != 0) {
         fprintf(stderr, "Validation failed: Sender's balance is too low for the transfer\n");
         return -1; // Validation failed
     }
