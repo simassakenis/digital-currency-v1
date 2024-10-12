@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 
@@ -174,20 +175,33 @@ int verify_signature(const unsigned char *signature, const unsigned char *messag
     return 0; // Signature is valid
 }
 
+int file_exists(const char *filename) {
+    struct stat buffer;
+    return (stat(filename, &buffer) == 0);
+}
+
+int load_public_key(unsigned char *public_key, const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
+        perror("Failed to open file for reading");
+        return -1;
+    }
+
+    // Read the 32-byte public key
+    if (fread(public_key, 1, crypto_sign_PUBLICKEYBYTES, file) != crypto_sign_PUBLICKEYBYTES) {
+        perror("Failed to read public key from file");
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+    return 0; // Success
+}
+
 int validate_and_add_transaction(struct Transaction *transaction,
                                  struct HashTable *user_cache,
                                  struct TransactionsCache *transactions_cache,
                                  const unsigned char *bank_public_key) {
-    if (transactions_cache->count < 10) {
-        if (add_transaction_to_cache(transactions_cache, transaction) != 0) {
-            fprintf(stderr, "Error: Unable to add transaction to cache\n");
-            return -1; // Failed to add transaction
-        }
-        update(user_cache, transaction->sender_public_key, transaction->index);
-        update(user_cache, transaction->recipient_public_key, transaction->index);
-        return 0;
-    }
-
     // Step 1: Check if sender has enough balance
     unsigned char *last_sender_transaction_index = lookup(user_cache, transaction->sender_public_key);
     uint64_t last_sender_balance = 0;
@@ -282,7 +296,6 @@ int validate_and_add_transaction(struct Transaction *transaction,
     update(user_cache, transaction->sender_public_key, transaction->index);
     update(user_cache, transaction->recipient_public_key, transaction->index);
 
-    printf("Transaction successfully validated and added to cache.\n");
     return 0; // Success
 }
 
@@ -424,6 +437,19 @@ int parse_query(const char *query, struct Transaction *tx) {
 }
 
 int main() {
+    // Load/generate bank's public key
+    unsigned char bank_public_key[crypto_sign_PUBLICKEYBYTES];
+
+    if (!file_exists("public_key.bin")) {
+        fprintf(stderr, "Bank's public key does not exist (run ./client to generate keys)\n");
+        return 1;
+    }
+
+    if (load_public_key(bank_public_key, "public_key.bin") != 0) {
+        fprintf(stderr, "Failed to load bank's public key\n");
+        return 1;
+    }
+
     struct TransactionsCache transactions_cache = {{0}, 0};
 
     // Will hold a user public key -> most recent transaction map
@@ -490,15 +516,6 @@ int main() {
                 printf("Error: Invalid hex string.\n");
             } else {
                 printf("Transaction parsed successfully.\n");
-                unsigned char bank_public_key[32] = {
-                    0x01, 0x02, 0x03, 0x04, 0x05,
-                    0x06, 0x07, 0x08, 0x09, 0x0A,
-                    0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-                    0x10, 0x11, 0x12, 0x13, 0x14,
-                    0x15, 0x16, 0x17, 0x18, 0x19,
-                    0x1A, 0x1B, 0x1C, 0x1D, 0x1E,
-                    0x1F, 0x20
-                };
                 if (validate_and_add_transaction(&new_transaction, &user_cache, &transactions_cache, bank_public_key) == 0) {
                     printf("Transaction successfully validated and added to cache.\n");
                 } else {
