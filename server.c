@@ -210,7 +210,16 @@ int validate_and_add_transaction(struct Transaction *transaction,
         uint64_t sender_index = bytes_to_uint64(last_sender_transaction_index);
         const struct Transaction *last_sender_transaction = (sender_index < transactions_cache->count) ?
                                                             &transactions_cache->transactions[sender_index] : NULL;
-        last_sender_balance = last_sender_transaction ? bytes_to_uint64(last_sender_transaction->new_sender_balance) : 0;
+        if (last_sender_transaction != NULL) {
+            if (memcmp(transaction->sender_public_key, last_sender_transaction->sender_public_key, 32) == 0) {
+                last_sender_balance = bytes_to_uint64(last_sender_transaction->new_sender_balance);
+            } else if (memcmp(transaction->sender_public_key, last_sender_transaction->recipient_public_key, 32) == 0) {
+                last_sender_balance = bytes_to_uint64(last_sender_transaction->new_recipient_balance);
+            } else {
+                // Sender must be either the sender or the recipient on it's last transaction
+                assert(0);
+            }
+        }
     }
 
     if (last_sender_balance < transfer_value && memcmp(transaction->sender_public_key, bank_public_key, 32) != 0) {
@@ -271,7 +280,17 @@ int validate_and_add_transaction(struct Transaction *transaction,
         uint64_t recipient_index = bytes_to_uint64(last_recipient_transaction_index);
         const struct Transaction *last_recipient_transaction = (recipient_index < transactions_cache->count) ?
                                                                &transactions_cache->transactions[recipient_index] : NULL;
-        uint64_t last_recipient_balance = last_recipient_transaction ? bytes_to_uint64(last_recipient_transaction->new_recipient_balance) : 0;
+        uint64_t last_recipient_balance = 0;
+        if (last_recipient_transaction != NULL) {
+            if (memcmp(transaction->recipient_public_key, last_recipient_transaction->sender_public_key, 32) == 0) {
+                last_recipient_balance = bytes_to_uint64(last_recipient_transaction->new_sender_balance);
+            } else if (memcmp(transaction->recipient_public_key, last_recipient_transaction->recipient_public_key, 32) == 0) {
+                last_recipient_balance = bytes_to_uint64(last_recipient_transaction->new_recipient_balance);
+            } else {
+                // Recipient must be either the sender or the recipient on it's last transaction
+                assert(0);
+            }
+        }
         uint64_t new_recipient_balance = last_recipient_balance + transfer_value;
         uint64_to_bytes(transaction->new_recipient_balance, new_recipient_balance);
     } else {
