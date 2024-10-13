@@ -1,6 +1,6 @@
 # digital-currency-v1
 
-This repository is an implementation of a digital payment system from scratch in C. The system consists of a server program that maintains a list of transactions and a client program that sends new transactions. The distribution of money across participants is fully described by the list of transactions at any given time.
+This repository is an implementation of a digital payment system from scratch in C. The system consists of a server program, `server.c`, that maintains a list of transactions and a client program, `client.c`, that sends new transactions. The distribution of money across participants is fully described by the list of transactions at any given time.
 
 Each transaction stores the following information:
 
