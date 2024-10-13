@@ -53,8 +53,3 @@ Use client program to send a new transaction:
 ./client "0X12E369D502D98851D25FAE1C68970B3B5172F7E01F219246ECCFD0E9EE4C9D3D" "0X0000000000000003"
 ```
 
-Print saved public or private key manually:
-```
-xxd -p -c 32 public_key.bin
-```
-
