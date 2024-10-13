@@ -48,3 +48,5 @@ Print saved public or private key manually:
 xxd -p -c 32 public_key.bin
 ```
 
+
+[Watch the Screen Recording](https://github.com/simassakenis/digital-currency-v1/blob/main/output.mp4)
