@@ -49,4 +49,4 @@ xxd -p -c 32 public_key.bin
 ```
 
 
-[Watch the Screen Recording](https://github.com/simassakenis/digital-currency-v1/blob/main/output.mp4)
+See [demo.mp4](https://github.com/simassakenis/digital-currency-v1/blob/main/demo.mp4) for an example of how this payment system would be used. I generate public-private key pairs for `bank`, `client1`, and `client2`, send 5 coins from `bank` to `client1`, then 5 coins from `bank` to `client2`, then 3 coins from `client1` to `client2`, and then 10 coins from `client2` to `client1`.
